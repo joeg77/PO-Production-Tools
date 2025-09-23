@@ -1,0 +1,983 @@
+// ========================== PDF & Spreadsheet Tools ==========================
+
+
+// ======= Constants =======
+// REPLACE ALL PLACEHOLDERS BELOW WITH REAL IDs!
+const TARGET_SPREADSHEET_ID = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY'; // Main Google Sheet
+const SPREADSHEET_ID = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY'; // Spreadsheet ID for imports/exports
+const AMAZON_FOLDER_ID = '1JKbS5nnUcnFgyc8WJzcPQd1aBJLp1uxz'; // Amazon folder for CSV exports
+const SAMS_EXCEL_FOLDER_ID = '1rVbXkXU-pC4YqcjgMzVwqCfWjDHb60Pp'; // Folder where Sam's Excel files are stored
+const SAMS_FOLDER_ID = '1rVbXkXU-pC4YqcjgMzVwqCfWjDHb60Pp'; // Same folder for CSV export
+const AMAZON_TXT_FOLDER_ID = '1JKbS5nnUcnFgyc8WJzcPQd1aBJLp1uxz'; // Amazon folder for TXT imports
+const TRADING_PARTNER_DESTINATION_ID = '1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY'; // Destination for copied trading partner PDFs
+const SHIPPING_LABEL_DESTINATION_ID = '1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN'; // Destination for copied shipping label PDFs
+const SHIPPING_MANIFEST_DESTINATION_ID = '11jxPplN9wGBIrtkyxUXo5tpaRaTzWX0a'; // Destination for copied shipping manifest PDFs
+const DDPOS_FOLDER_ID = 'DDPOS_FOLDER_ID'; // Replace with DDPOS folder ID
+const DDPOS_FILENAME = 'document-PS-ddpos'; // Filename for DDPOS PDFs
+const DIG_DEFENCE_FOLDER_ID = '1YScXpnNqJSjWM4tdxna95YqI0D9hzknJ';
+
+
+
+// Trading Partner Folders and Filenames
+const tradingPartners = [
+  { id: "1ovwLcs_YV2lSjFaYHBPMHo8PIW-_MlnK", filename: "document-PS-amazon" },
+  { id: "1Q-jruIpq7B8QtE6yK5Lk0Ti0sSt0V5lD", filename: "document-PS-chewy" },
+  { id: "1ITFXqNNBSnTH2NXpH-hgwUADLT03RewS", filename: "document-PS-dd" },
+  { id: "1AdT30LJTuoqe3Zc-FLs0GcfS0mSFhkpY", filename: "document-PS-homedepot" },
+  { id: "1iw82vvO3jupkbSCC98zInvAFm7_tkIUy", filename: "document-PS-lowes" },
+  { id: "1NH19Eiq_Kc5uAEmdijSkuNdYIJYClHCU", filename: "document-PS-menards" },
+  { id: "1NU7d8mbYczxAsRMgp26sIIWXAJmIY81w", filename: "document-PS-misc" },
+  { id: "1bYgzoAZTIho6T40d0BdRqRpQZy3b1QNF", filename: "document-PS-petco" },
+  { id: "1r9hQKTMAHcdGKu_vKLQqqo3fhSpUIdsX", filename: "document-PS-sams" },
+  { id: "13NDlqSswGZiZLkmA3eIWf0yIPynxuEdn", filename: "document-PS-sample" },
+  { id: "1bj4hvpxThfHjYFOEo6Z21Oz1OUyecE4D", filename: "document-PS-shein" },
+  { id: "1wf1b5VjkfLCaFFOW4YLu06Mewx_IKgjr", filename: "document-PS-temu" },
+  { id: "1jBh9NiUIBP7lPmTgmRr1GJH7U6KNU4ip", filename: "document-PS-tiktok" },
+  { id: "1_6bWlFYtVXaya2LJazaL0hQaDiiNY-gP", filename: "document-PS-tsc" },
+  { id: "1IO456og1_zpPphW7Wi0co-V_AA6TXDmU", filename: "document-PS-walmart" },
+  { id: "18RJO-_HZVXLT9xkFbHVHG7jYwMLL08QA", filename: "document-PS-wf" },
+  { id: "1yzEmFqG-T50m1sao1-f0rzGzH5sXGwc6", filename: "document-PS-wcs" }
+];
+
+
+// Shipping Label Folders and Filenames
+const shippingLabelPartners = [
+  { id: "1XQPZM7A6X_qBzbmDvYp7NTm5YbQj57Nu", filename: "document-PS-amazon-L" },
+  { id: "16Cx9vAtcc9nTDp4VqUnx2Dh-U_m1gIzO", filename: "document-PS-chewy-L" },
+  { id: "1uO0XdjcyZoQEsh8e9oClAX3B-2qhAmOU", filename: "document-PS-dd-L" },
+  { id: "1NJb3erGUmEn58F_-lQcnUYRT7aJkqrrf", filename: "document-PS-homedepot-L" },
+  { id: "1mOUT7ED0_HXoxvB2h32psWNsHDdp7sk8", filename: "document-PS-lowes-L" },
+  { id: "15n4b6lN89hyfoJZyh-95WWXkwp3om3Tn", filename: "document-PS-menards-L" },
+  { id: "1rqPN32qM6E4JosTz2MUIaFu7SmffcIaV", filename: "document-PS-misc-L" },
+  { id: "1Lv1ko6T1iaF_KLfWWINmRawqHzKj9sVR", filename: "document-PS-petco-L" },
+  { id: "1e54ohDfqoBpzXgbiVDjDK1vOd0EFzRlH", filename: "document-PS-sample-L" },
+  { id: "1VMIJS7rMmiD5LFeRM2Tk-AlBx0Q4xqx9", filename: "document-PS-sams-L" },
+  { id: "1s8BR3wrU00El28URuzs5TlxcGarckcCE", filename: "document-PS-shein-L" },
+  { id: "166-_f7eSc_3f5wfTmhPeUSpvnpXupWhM", filename: "document-PS-temu-L" },
+  { id: "16RrWIl7te5-KiUJPQRTJy9CzxFaGrMx2", filename: "document-PS-tiktok-L" },
+  { id: "1KzmYw6ib0iVEKElmF_Zyogz-MRfXJkol", filename: "document-PS-tsc-L" },
+  { id: "1aGSbBy7AcwrfUuLkSeL3ajLny1_XTz7P", filename: "document-PS-walmart-L" },
+  { id: "1h--ElgLZMh7jnqSq1jepxHnoKQ-7LTNe", filename: "document-PS-wf-L" },
+  { id: "1w1aZYMf5BhSvZhMOmPIQJJH9PrfBkBfy", filename: "document-PS-wcs-L" }
+];
+
+
+// Shipping Manifest Folders and Filenames
+const shippingManifestPartners = [
+  { id: "1BfAbKRGq8qIGT7IznZDS9numy_zx2ELe", filename: "document-PS-amazon-T" },
+  { id: "1R7_m9ikTPYQVpf3ZGrsyC5roDtSEWbLN", filename: "document-PS-chewy-T" },
+  { id: "1TpO6GbpXeg39MLTOYMPg94Mpw57z3GCp", filename: "document-PS-dd-T" },
+  { id: "1V22gTNVIy5lSjTlI2GvYe3J3Uq3juh5H", filename: "document-PS-homedepot-T" },
+  { id: "1bQlGZ1NDMBQarYmI3UoDn8U_3LMRZ3Vv", filename: "document-PS-lowes-T" },
+  { id: "1MWnzjyQKJScOYEoOUBTWhtREtnkFQzUD", filename: "document-PS-menards-T" },
+  { id: "1lmnV0C2MW-zfk2wZX3AUArrOUdm67JMW", filename: "document-PS-misc-T" },
+  { id: "1_I-qReisOkz0TTFjcJ9Bphh7q3Ps5Z_G", filename: "document-PS-petco-T" },
+  { id: "18vr5SlrIaHnpjcTWPw-NCAffHE5wP7kD", filename: "document-PS-sample-T" },
+  { id: "1nLU_ylqhASxeZC2UtYDCAVBMuNEH8dmf", filename: "document-PS-sams-T" },
+  { id: "16ZVIpkiWcDIylg5t4v1KXDAIKbnvPoDQ", filename: "document-PS-shein-T" },
+  { id: "10-suGsWhIDFx572-1eJHwRSOtJdIo7WH", filename: "document-PS-temu-T" },
+  { id: "1v9LPUw3aojyq2T_iO6Xz9KuN4Vly3rr1", filename: "document-PS-tiktok-T" },
+  { id: "1VVFW4CMBOZBvHRFOJd36G_-wRBVitnK3", filename: "document-PS-tsc-T" },
+  { id: "1LsB_yIh2y4hK1zAMcUl0Y9Pxr7PJTkvt", filename: "document-PS-walmart-T" },
+  { id: "15PT6-0zVn9-y_SZs3WeZySK2B11kPE7p", filename: "document-PS-wf-T" },
+  { id: "1kiVrEXnrOluFepxdcPGAC4xSNa9Wbc9L", filename: "document-PS-wcs-T" }
+];
+
+
+// ======= Trading Partner PDF Renaming =======
+function renameTradingPartnerFiles() {
+  let totalFiles = 0;
+  tradingPartners.forEach(partner => {
+    try {
+      Logger.log(`Renaming files in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+      let index = 1;
+      while (files.hasNext()) {
+        const file = files.next();
+        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}.pdf`);
+        index++;
+        totalFiles++;
+      }
+      Logger.log(`Renamed ${index - 1} files in folder ${partner.id}`);
+    } catch (e) {
+      Logger.log(`Error renaming in folder ${partner.id}: ${e.message}`);
+    }
+  });
+  return `✅ Renamed ${totalFiles} trading partner PDFs`;
+}
+
+
+// ======= Shipping Labels Renaming =======
+function renameShippingLabels() {
+  let totalFiles = 0;
+  shippingLabelPartners.forEach(partner => {
+    try {
+      Logger.log(`Renaming shipping labels in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+      let index = 1;
+      while (files.hasNext()) {
+        const file = files.next();
+        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}.pdf`);
+        index++;
+        totalFiles++;
+      }
+      Logger.log(`Renamed ${index - 1} shipping labels in folder ${partner.id}`);
+    } catch (e) {
+      Logger.log(`Error renaming in folder ${partner.id}: ${e.message}`);
+    }
+  });
+  return `✅ Renamed ${totalFiles} shipping label PDFs`;
+}
+
+
+// ======= Shipping Manifests Renaming =======
+function renameShippingManifestPDFs() {
+  let totalFiles = 0;
+  shippingManifestPartners.forEach(partner => {
+    try {
+      Logger.log(`Renaming shipping manifests in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+      let index = 1;
+      while (files.hasNext()) {
+        const file = files.next();
+        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}.pdf`);
+        index++;
+        totalFiles++;
+      }
+      Logger.log(`Renamed ${index - 1} shipping manifests in folder ${partner.id}`);
+    } catch (e) {
+      Logger.log(`Error renaming in folder ${partner.id}: ${e.message}`);
+    }
+  });
+  return `✅ Renamed ${totalFiles} shipping manifest PDFs`;
+}
+
+
+// ======= DDPOS Files Renaming =======
+function renameDDPOSFiles() {
+  try {
+    Logger.log(`Renaming DDPOS files in folder ${DDPOS_FOLDER_ID}`);
+    const folder = DriveApp.getFolderById(DDPOS_FOLDER_ID);
+    const files = folder.getFilesByType(MimeType.PDF);
+    let index = 1;
+    let totalFiles = 0;
+    while (files.hasNext()) {
+      const file = files.next();
+      file.setName(`${DDPOS_FILENAME}${index > 1 ? `-${index}` : ''}.pdf`);
+      index++;
+      totalFiles++;
+    }
+    Logger.log(`Renamed ${totalFiles} DDPOS files`);
+    return `✅ Renamed ${totalFiles} DDPOS PDFs`;
+  } catch (e) {
+    Logger.log(`Error renaming DDPOS files: ${e.message}`);
+    return `⚠️ Failed to rename DDPOS PDFs: ${e.message}`;
+  }
+}
+
+
+// ======= Copy Trading Partner PDFs =======
+function copyTradingPartnerPDFs() {
+  let totalFiles = 0;
+  try {
+    Logger.log(`Copying to destination folder ${TRADING_PARTNER_DESTINATION_ID}`);
+    const destFolder = DriveApp.getFolderById(TRADING_PARTNER_DESTINATION_ID);
+    tradingPartners.forEach(partner => {
+      try {
+        Logger.log(`Copying from folder ${partner.id}`);
+        const sourceFolder = DriveApp.getFolderById(partner.id);
+        const files = sourceFolder.getFilesByType(MimeType.PDF);
+        let index = 1;
+        while (files.hasNext()) {
+          const file = files.next();
+          file.makeCopy(`${file.getName()}${index > 1 ? `-${index}` : ''}`, destFolder);
+          index++;
+          totalFiles++;
+        }
+        Logger.log(`Copied ${index - 1} files from folder ${partner.id}`);
+      } catch (e) {
+        Logger.log(`Error copying from folder ${partner.id}: ${e.message}`);
+      }
+    });
+    return `✅ Copied ${totalFiles} trading partner PDFs to destination folder`;
+  } catch (e) {
+    Logger.log(`Error accessing destination folder ${TRADING_PARTNER_DESTINATION_ID}: ${e.message}`);
+    return `⚠️ Failed to copy trading partner PDFs: ${e.message}`;
+  }
+}
+
+
+// ======= Copy Shipping Label PDFs =======
+function copyShippingLabelPDFs() {
+  let totalFiles = 0;
+  try {
+    Logger.log(`Copying to destination folder ${SHIPPING_LABEL_DESTINATION_ID}`);
+    const destFolder = DriveApp.getFolderById(SHIPPING_LABEL_DESTINATION_ID);
+    shippingLabelPartners.forEach(partner => {
+      try {
+        Logger.log(`Copying from folder ${partner.id}`);
+        const sourceFolder = DriveApp.getFolderById(partner.id);
+        const files = sourceFolder.getFilesByType(MimeType.PDF);
+        let index = 1;
+        while (files.hasNext()) {
+          const file = files.next();
+          file.makeCopy(`${file.getName()}${index > 1 ? `-${index}` : ''}`, destFolder);
+          index++;
+          totalFiles++;
+        }
+        Logger.log(`Copied ${index - 1} files from folder ${partner.id}`);
+      } catch (e) {
+        Logger.log(`Error copying from folder ${partner.id}: ${e.message}`);
+      }
+    });
+    return `✅ Copied ${totalFiles} shipping label PDFs to destination folder`;
+  } catch (e) {
+    Logger.log(`Error accessing destination folder ${SHIPPING_LABEL_DESTINATION_ID}: ${e.message}`);
+    return `⚠️ Failed to copy shipping label PDFs: ${e.message}`;
+  }
+}
+
+
+// ======= Copy Shipping Manifest PDFs =======
+function copyShippingManifestPDFs() {
+  let totalFiles = 0;
+  try {
+    Logger.log(`Copying to destination folder ${SHIPPING_MANIFEST_DESTINATION_ID}`);
+    const destFolder = DriveApp.getFolderById(SHIPPING_MANIFEST_DESTINATION_ID);
+    shippingManifestPartners.forEach(partner => {
+      try {
+        Logger.log(`Copying from folder ${partner.id}`);
+        const sourceFolder = DriveApp.getFolderById(partner.id);
+        const files = sourceFolder.getFilesByType(MimeType.PDF);
+        let index = 1;
+        while (files.hasNext()) {
+          const file = files.next();
+          file.makeCopy(`${file.getName()}${index > 1 ? `-${index}` : ''}`, destFolder);
+          index++;
+          totalFiles++;
+        }
+        Logger.log(`Copied ${index - 1} files from folder ${partner.id}`);
+      } catch (e) {
+        Logger.log(`Error copying from folder ${partner.id}: ${e.message}`);
+      }
+    });
+    return `✅ Copied ${totalFiles} shipping manifest PDFs to destination folder`;
+  } catch (e) {
+    Logger.log(`Error accessing destination folder ${SHIPPING_MANIFEST_DESTINATION_ID}: ${e.message}`);
+    return `⚠️ Failed to copy shipping manifest PDFs: ${e.message}`;
+  }
+}
+
+
+// ======= CSV Export Helpers =======
+// ======= CSV Export Helpers =======
+function exportSheetAsCSV(filename, folderId, sheetName = 'Sheet1') {
+  try {
+    Logger.log(`Using Spreadsheet ID: ${SPREADSHEET_ID}`);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log(`Sheets available: ${ss.getSheets().map(s => s.getName())}`);
+
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      Logger.log(`Sheet "${sheetName}" not found! Available sheets: ${ss.getSheets().map(s => s.getName())}`);
+      throw new Error(`Sheet "${sheetName}" not found`);
+    }
+    Logger.log(`Sheet retrieved: ${sheet.getName()}`);
+
+    // Safely get data as 2D array
+    const dataRange = sheet.getDataRange();
+    Logger.log("Data range A1 notation: " + dataRange.getA1Notation());
+    let data = dataRange.getValues();
+
+    if (!Array.isArray(data) || !Array.isArray(data[0])) {
+      Logger.log("Data is not a 2D array, wrapping single cell in array");
+      data = [[data]];
+    }
+
+    Logger.log("Data type: " + typeof data + ", isArray: " + Array.isArray(data));
+    Logger.log("Data preview: " + JSON.stringify(data.slice(0, 5)));
+
+    const rowCount = data.length;
+    if (rowCount === 0) {
+      throw new Error(`No data found in ${sheetName}`);
+    }
+
+    const csvContent = data
+      .map(r => r.map(c => `"${c.toString().replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+
+    Logger.log(`Exporting ${filename} to folder ${folderId}`);
+    const folder = DriveApp.getFolderById(folderId);
+
+    const existingFiles = folder.getFilesByName(filename);
+    while (existingFiles.hasNext()) {
+      existingFiles.next().setTrashed(true);
+    }
+
+    folder.createFile(filename, csvContent, MimeType.CSV);
+    Logger.log(`Exported ${filename} with ${rowCount} rows`);
+    return `✅ Exported ${filename} with ${rowCount} rows to folder`;
+
+  } catch (e) {
+    Logger.log(`Error exporting ${filename}: ${e.message}`);
+    return `⚠️ Failed to export ${filename}: ${e.message}`;
+  }
+}
+
+// ======= Amazon CSV Exports =======
+function exportPSAmazon() { return exportSheetAsCSV('document-PS-amazon.csv', AMAZON_FOLDER_ID, 'Sheet1'); }
+function exportPSAmazonThurs() { return exportSheetAsCSV('document-PS-amazon-thurs.csv', AMAZON_FOLDER_ID, 'Sheet1'); }
+function exportPSAmazonSun() { return exportSheetAsCSV('document-PS-amazon-sun.csv', AMAZON_FOLDER_ID, 'Sheet1'); }
+
+
+// ======= Sam's CSV Exports =======
+function exportPSSams() {
+  const targetSS = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+  const sheet = targetSS.getSheetByName('Sheet1');
+  const data = sheet.getDataRange().getValues();
+  return exportSheetAsCSVWithData('document-PS-sams.csv', data);
+}
+
+function exportPSSamsThurs() {
+  const targetSS = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+  const sheet = targetSS.getSheetByName('Sheet1');
+  const data = sheet.getDataRange().getValues();
+  return exportSheetAsCSVWithData('document-PS-sams-thurs.csv', data);
+}
+
+function exportPSSamsSun() {
+  const targetSS = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+  const sheet = targetSS.getSheetByName('Sheet1');
+  const data = sheet.getDataRange().getValues();
+  return exportSheetAsCSVWithData('document-PS-sams-sun.csv', data);
+}
+
+// Helper to create CSV
+function exportSheetAsCSVWithData(filename, data) {
+  const csvContent = data.map(r => r.map(c => `"${c.toString().replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const folder = DriveApp.getFolderById(SAMS_FOLDER_ID);
+
+  // Delete old CSV if exists
+  const existingFiles = folder.getFilesByName(filename);
+  while(existingFiles.hasNext()) existingFiles.next().setTrashed(true);
+
+  folder.createFile(filename, csvContent, MimeType.CSV);
+  return `✅ Exported CSV: ${filename}`;
+}
+
+// ======= Dig Defence CSV Renaming =======
+function renameDigDefenceCSV(filenameBase) {
+  try {
+    const folder = DriveApp.getFolderById(DIG_DEFENCE_FOLDER_ID);
+    const files = folder.getFilesByType(MimeType.CSV);
+    let latestFile = null;
+    let latestDate = new Date(0);
+
+    while(files.hasNext()) {
+      const file = files.next();
+      const date = file.getLastUpdated();
+      if(date > latestDate) {
+        latestDate = date;
+        latestFile = file;
+      }
+    }
+
+    if (!latestFile) return `⚠️ No CSV files found in Dig Defence folder`;
+
+    latestFile.setName(filenameBase);
+    return `✅ Renamed latest CSV to ${filenameBase}`;
+  } catch(e) {
+    Logger.log(`Error renaming Dig Defence CSV: ${e.message}`);
+    return `⚠️ Failed to rename Dig Defence CSV: ${e.message}`;
+  }
+}
+
+// Helper functions for specific days
+function renameDigDefenceCSVDefault() { return renameDigDefenceCSV('document-PS-dd.csv'); }
+function renameDigDefenceCSVThurs() { return renameDigDefenceCSV('document-PS-dd-thurs.csv'); }
+function renameDigDefenceCSVSun() { return renameDigDefenceCSV('document-PS-dd-sun.csv'); }
+
+/**
+ * Import .neworders or .csv from a folder and write to Sheet1
+ * @param {string} folderId - Google Drive folder ID
+ */
+function importNewordersByFolder(folderId) {
+  const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  const folder = DriveApp.getFolderById(folderId);
+  const files = folder.getFiles();
+  let importedCount = 0;
+
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = ss.getSheetByName("Sheet1");
+  if (!sheet) return '❌ Could not find "Sheet1" in spreadsheet';
+
+  sheet.clearContents();
+
+  while (files.hasNext()) {
+    const file = files.next();
+    let name = file.getName();
+
+    if (name.toLowerCase().endsWith('.neworders')) {
+      const newName = name.replace(/\.neworders$/i, '.csv');
+      const blob = file.getBlob().setName(newName);
+      folder.createFile(blob);
+      file.setTrashed(true);
+      name = newName;
+    }
+
+    if (name.toLowerCase().endsWith('.csv')) {
+      const csvData = Utilities.parseCsv(file.getBlob().getDataAsString('UTF-8'));
+      if (csvData.length > 0) {
+        sheet.getRange(1, 1, csvData.length, csvData[0].length).setValues(csvData);
+        importedCount++;
+      }
+    }
+  }
+
+  return `✅ ${importedCount} file(s) imported from folder.`;
+}
+
+// Home Depot
+function importNewordersHomeDepot() {
+  const folderId = '1TztSvnQsc3uu8vsMPTBRpwCUuIPVLKP8';
+  return importNewordersByFolder(folderId);
+}
+
+// Lowes
+function importNewordersLowes() {
+  const folderId = '1R1Q_caIMp7t0rIH54Jq2uBS4ozViySrF';
+  return importNewordersByFolder(folderId);
+}
+
+
+// Apply weight mapping to Column L
+function applyWeightFormula() {
+  const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY');
+  const sheet = ss.getSheetByName('Sheet1');
+  if (!sheet) return '❌ Sheet1 not found';
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '⚠️ No rows to process';
+
+  // Read SKUs from Column M (13)
+  const data = sheet.getRange(2, 13, lastRow - 1, 1).getValues();
+
+  const weightMap = {
+    "DDXL152402": 7.6, "DDXL152405": 18, "DDXL152415": 52.5,
+    "DD2083204": 8.5, "DD2083210": 20, "DD2083225": 49,
+    "DD3103204": 8.8, "DD3103210": 20.4, "DD3103225": 49.8,
+    "315471600": 7.6, "315471537": 18, "315471541": 52.5,
+    "315471488": 8.5, "315471498": 20, "DD2083210-BL": 20.3,
+    "DD2083225-BL": 49.3, "DDAC-TOOL": 19.9, "315471515": 49,
+    "315471525": 8.8, "315471581": 20.4, "315471588": 49.8
+  };
+
+  const unmatched = [];
+
+  const output = data.map((row, index) => {
+    const key = String(row[0]).trim();
+    if (!weightMap.hasOwnProperty(key)) {
+      unmatched.push({ row: index + 2, value: key }); // log row number and value
+    }
+    return [weightMap[key] || 0];
+  });
+
+  // Write results to Column L (12)
+  sheet.getRange(2, 12, output.length, 1).setValues(output);
+
+  if (unmatched.length > 0) {
+    Logger.log("Unmatched SKU details: %s", JSON.stringify(unmatched));
+  }
+
+  return `✅ Weights applied to Column L. ${unmatched.length > 0 ? unmatched.length + " unmatched SKUs (see logs)" : ""}`;
+}
+
+
+// Fix zip codes in Column H
+function fixZipCodesValidation() {
+  try {
+    const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY');
+    const sheet = ss.getSheetByName("Sheet1");
+    if (!sheet) return '❌ Sheet1 not found.';
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return '⚠️ No rows to process.';
+
+    const range = sheet.getRange(2, 8, lastRow - 1);
+    const values = range.getValues();
+    sheet.getRange(2, 8, lastRow - 1).setNumberFormat('@STRING@');
+
+    const fixed = values.map(row => {
+      let zip = row[0];
+      if (zip !== "" && zip !== null && zip !== undefined) {
+        zip = zip.toString().trim().padStart(5, '0');
+        return [zip];
+      }
+      return [""];
+    });
+
+    range.setValues(fixed);
+
+    return '✅ Zip codes are fixed!';
+  } catch (err) {
+    return `❌ Error fixing zip codes: ${err.message}`;
+  }
+}
+
+
+// Validation check for limits
+function checkLowesHomeDepotLimitsValidation() {
+  try {
+    const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY');
+    const sheets = ss.getSheets();
+
+    let alertMessages = [];
+
+    sheets.forEach(sheet => {
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) return; // skip empty sheets
+
+      // Clear previous highlights
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).setBackground(null);
+
+      const colL = sheet.getRange(2, 12, lastRow - 1, 1).getValues(); // Weight
+      const colQ = sheet.getRange(2, 17, lastRow - 1, 1).getValues(); // Packs
+      const colV = sheet.getRange(2, 22, lastRow - 1, 1).getValues(); // Store
+
+      for (let i = 0; i < colL.length; i++) {
+        const store = String(colV[i][0]).trim().toLowerCase();
+        let maxRowWeight = null;
+
+        if (store === 'lowes') maxRowWeight = 450;
+        else if (store === 'thehomedepot') maxRowWeight = 500;
+        else continue; // skip other stores
+
+        const weight = Number(String(colL[i][0]).trim()) || 0;
+        const packs = Number(String(colQ[i][0]).trim()) || 0;
+        const rowTotalWeight = weight * packs;
+
+        let rowAlerts = [];
+        if (rowTotalWeight > maxRowWeight) rowAlerts.push(`weight (${rowTotalWeight} > ${maxRowWeight})`);
+        if (packs > 25) rowAlerts.push(`packs (${packs} > 25)`);
+
+        if (rowAlerts.length > 0) {
+          alertMessages.push(`${sheet.getName()}: Row ${i + 2} exceeds ${rowAlerts.join(' and ')}`);
+          // Highlight the row pale red
+          sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBackground('#F8D7DA');
+        }
+      }
+    });
+
+    if (alertMessages.length > 0) {
+      return `⚠️ Alerts:\n${alertMessages.join('\n')}`;
+    } else {
+      return '✅ All Lowes and Home Depot rows are within limits.';
+    }
+  } catch (err) {
+    return `❌ Error checking limits: ${err.message}`;
+  }
+}
+
+
+// ======= Import Amazon TXT =======
+function importPSAmazon() {
+  try {
+    Logger.log(`Accessing folder ${AMAZON_TXT_FOLDER_ID} for TXT files`);
+    const folder = DriveApp.getFolderById(AMAZON_TXT_FOLDER_ID);
+    const files = folder.getFilesByType(MimeType.PLAIN_TEXT);
+    let latestFile = null;
+    let latestDate = new Date(0);
+
+
+    while (files.hasNext()) {
+      const file = files.next();
+      const date = file.getLastUpdated();
+      if (date > latestDate) {
+        latestDate = date;
+        latestFile = file;
+      }
+    }
+
+
+    if (!latestFile) {
+      Logger.log('No TXT files found in folder');
+      return '⚠️ No TXT files found in folder';
+    }
+
+
+    const fileName = latestFile.getName();
+    Logger.log(`Processing latest TXT file: ${fileName}`);
+    const txtContent = latestFile.getBlob().getDataAsString();
+    const rows = txtContent.trim().split('\n').map(line => line.split('\t'));
+
+
+    if (rows.length < 2) {
+      Logger.log('File appears empty or invalid');
+      return '⚠️ File appears empty or invalid';
+    }
+
+
+    // Log header row and key columns
+    const headers = rows[0];
+    Logger.log(`Header row (${headers.length} columns): ${headers.join(', ')}`);
+
+
+    // Find column indices dynamically
+    const skuIndex = headers.indexOf('sku');
+    const productNameIndex = headers.indexOf('product-name');
+    const orderItemIdIndex = headers.indexOf('order-item-id');
+    const quantityIndex = headers.indexOf('quantity-purchased');
+    Logger.log(`Detected indices: product-name=${productNameIndex}, sku=${skuIndex}, order-item-id=${orderItemIdIndex}, quantity-purchased=${quantityIndex}`);
+
+
+    // Validate key columns
+    if (skuIndex === -1 || orderItemIdIndex === -1) {
+      Logger.log('Required columns (sku, order-item-id) not found');
+      return '⚠️ Required columns (sku, order-item-id) not found in TXT file';
+    }
+
+
+    // Log raw data for first 3 rows
+    const dataRows = rows.slice(1);
+    dataRows.slice(0, 3).forEach((row, index) => {
+      Logger.log(`Row ${index + 1} - Raw data: product-name=${row[productNameIndex] || 'empty'}, sku=${row[skuIndex] || 'empty'}, order-item-id=${row[orderItemIdIndex] || 'empty'}`);
+    });
+
+
+    // Validate SKU column
+    const invalidSkus = dataRows.filter(row => !row[skuIndex] || row[skuIndex].trim() === '').length;
+    if (invalidSkus > 0) {
+      Logger.log(`Warning: ${invalidSkus} rows have empty or invalid SKUs`);
+    }
+
+
+    Logger.log(`Opening spreadsheet ${SPREADSHEET_ID}`);
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Sheet1') ||
+                  SpreadsheetApp.openById(SPREADSHEET_ID).insertSheet('Sheet1');
+    sheet.clearContents();
+
+
+    const targetHeaders = [
+      "PKG_PACKAGE_ID","SHPTO_NAME","SHPTO_ADDRESS_1","SHPTO_ADDRESS_2","SHPTO_ADDRESS_3",
+      "SHPTO_CITY","SHPTO_STATE_PROV","SHPTO_POSTAL_CODE","SHPTO_COUNTRY_ID","SHPTO_TELEPHONE",
+      "PKG_SERVICE_TYPE","PKG_WEIGHT_ACTUAL","PKG_CUSTOM1","PKG_CUSTOM2","PKG_CUSTOM3",
+      "PKG_CUSTOM4","PKG_CUSTOM5","SHPTO_RESIDENTIAL","UOL_SOURCE","SHPTO_ATTN_LINE",
+      "SHPTO_COMPANY","MERCHANT_ID"
+    ];
+    sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+
+
+    const colMapping = [
+      [0, 0],   // order-id -> PKG_PACKAGE_ID
+      [8, 1],   // buyer-name -> SHPTO_NAME
+      [18, 2],  // ship-address-1 -> SHPTO_ADDRESS_1
+      [19, 3],  // ship-address-2 -> SHPTO_ADDRESS_2
+      [20, 4],  // ship-address-3 -> SHPTO_ADDRESS_3
+      [21, 5],  // ship-city -> SHPTO_CITY
+      [22, 6],  // ship-state -> SHPTO_STATE_PROV
+      [23, 7],  // ship-postal-code -> SHPTO_POSTAL_CODE
+      [24, 8],  // ship-country -> SHPTO_COUNTRY_ID
+      [10, 9],  // buyer-phone-number -> SHPTO_TELEPHONE
+      [orderItemIdIndex, 12], // order-item-id -> PKG_CUSTOM1
+      [skuIndex, 13],        // sku -> PKG_CUSTOM2
+      [quantityIndex, 15],   // quantity-purchased -> PKG_CUSTOM4
+    ];
+
+
+    const output = dataRows.map(row => {
+      let newRow = new Array(targetHeaders.length).fill('');
+      colMapping.forEach(([src, dest]) => {
+        if (src === skuIndex && (!row[src] || row[src].trim() === '')) {
+          newRow[dest] = 'MISSING_SKU';
+        } else {
+          newRow[dest] = row[src] || '';
+        }
+      });
+      newRow[21] = "Amazon"; // MERCHANT_ID
+      return newRow;
+    });
+
+
+    if (output.length > 0) {
+      sheet.getRange(2, 1, output.length, targetHeaders.length).setValues(output);
+      Logger.log(`Imported ${output.length} rows from ${fileName}`);
+      const exportResult = exportPSAmazon();
+      return `✅ ${fileName} import complete! Rows imported: ${output.length}. Check logs if SKUs are missing.\n${exportResult}`;
+    } else {
+      Logger.log('No data rows to import');
+      return '⚠️ No data rows found in TXT file';
+    }
+  } catch (e) {
+    Logger.log(`Error importing Amazon TXT: ${e.message}`);
+    return `⚠️ Failed to import Amazon TXT: ${e.message}`;
+  }
+}
+
+
+// ----- Convert latest Excel to Google Sheet & import -----
+function convertLatestSamsExcelToCSVAndImport() {
+  try {
+    const folder = DriveApp.getFolderById(SAMS_FOLDER_ID);
+    const files = [];
+    const fileIter = folder.getFiles();
+    while(fileIter.hasNext()) files.push(fileIter.next());
+    if (!files.length) return '❌ No files found in Sam\'s folder.';
+
+    // pick latest Excel file
+    const excelFile = files
+      .filter(f => f.getName().toLowerCase().endsWith('.xlsx') || f.getName().toLowerCase().endsWith('.xls'))
+      .sort((a,b) => b.getDateCreated() - a.getDateCreated())[0];
+    if (!excelFile) return '❌ No Excel file found in Sam\'s folder.';
+
+    // Convert Excel to temporary Google Sheet
+    const tempSheetId = uploadExcelAsGoogleSheet_(excelFile.getBlob(), 'TempSamImport');
+    const tempSS = SpreadsheetApp.openById(tempSheetId);
+    const sheet = pickDensestSheet_(tempSS);
+    if (!sheet) {
+      DriveApp.getFileById(tempSheetId).setTrashed(true);
+      return '❌ No sheet found in Excel file.';
+    }
+
+    // Import into target spreadsheet (populate "Sams" sheet)
+// Import into target spreadsheet (overwrite "Sheet1")
+const targetSS = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+const targetSheetName = 'Sheet1';  // <-- overwrite this sheet
+let targetSheet = targetSS.getSheetByName(targetSheetName);
+if (!targetSheet) {
+  targetSheet = targetSS.insertSheet(targetSheetName);
+} else {
+  targetSheet.clearContents();
+}
+
+const data = sheet.getDataRange().getValues();
+if (data.length) {
+  targetSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+}
+
+    // Export CSV
+    exportSheetAsCSV('document-PS-sams.csv', data);
+
+    // Delete temporary Google Sheet
+    DriveApp.getFileById(tempSheetId).setTrashed(true);
+
+    return `✅ Imported "${excelFile.getName()}" into "Sams" sheet (${data.length} rows) and exported CSV.`;
+  } catch (err) {
+    return `⚠️ Failed to convert/import Sam's Excel: ${err.message}`;
+  }
+}
+
+// ----- Helper: Upload Excel as temporary Google Sheet -----
+function uploadExcelAsGoogleSheet_(blob, newName) {
+  const token = ScriptApp.getOAuthToken();
+  const boundary = '-------314159265358979323846';
+  const metadata = { name: newName, mimeType: 'application/vnd.google-apps.spreadsheet' };
+  const metaPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`;
+  const filePartHeader = `--${boundary}\r\nContent-Type: ${blob.getContentType()}\r\n\r\n`;
+  const closeDelim = `\r\n--${boundary}--`;
+
+  const payload = Utilities.newBlob(metaPart).getBytes()
+    .concat(Utilities.newBlob(filePartHeader).getBytes())
+    .concat(blob.getBytes())
+    .concat(Utilities.newBlob(closeDelim).getBytes());
+
+  const res = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'post',
+    contentType: `multipart/related; boundary=${boundary}`,
+    payload: payload,
+    headers: { Authorization: `Bearer ${token}` },
+    muteHttpExceptions: true
+  });
+
+  const json = JSON.parse(res.getContentText());
+  if (!json.id) throw new Error('Drive upload succeeded but returned no file id.');
+  return json.id;
+}
+
+// ----- Helper: Pick densest sheet from Google Sheet -----
+function pickDensestSheet_(ss) {
+  const sheets = ss.getSheets();
+  if (!sheets.length) return null;
+  let best = sheets[0], bestCount = -1;
+  for (const sh of sheets) {
+    const vals = sh.getDataRange().getValues();
+    let count = 0;
+    for (const row of vals) for (const cell of row) if (cell !== '' && cell !== null) count++;
+    if (count > bestCount) { bestCount = count; best = sh; }
+  }
+  return best;
+}
+
+// ----- Helper: Export CSV -----
+function exportSheetAsCSV(filename, data) {
+  const csvContent = data.map(r => r.map(c => `"${c.toString().replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const folder = DriveApp.getFolderById(SAMS_FOLDER_ID);
+
+  // Delete old CSV if exists
+  const existingFiles = folder.getFilesByName(filename);
+  while(existingFiles.hasNext()) existingFiles.next().setTrashed(true);
+
+  folder.createFile(filename, csvContent, MimeType.CSV);
+}
+// ----- Helper: Upload Excel as temporary Google Sheet -----
+function uploadExcelAsGoogleSheet_(blob, newName) {
+  const token = ScriptApp.getOAuthToken();
+  const boundary = '-------314159265358979323846';
+  const metadata = { name: newName, mimeType: 'application/vnd.google-apps.spreadsheet' };
+  const metaPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`;
+  const filePartHeader = `--${boundary}\r\nContent-Type: ${blob.getContentType()}\r\n\r\n`;
+  const closeDelim = `\r\n--${boundary}--`;
+
+  const payload = Utilities.newBlob(metaPart).getBytes()
+    .concat(Utilities.newBlob(filePartHeader).getBytes())
+    .concat(blob.getBytes())
+    .concat(Utilities.newBlob(closeDelim).getBytes());
+
+  const res = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'post',
+    contentType: `multipart/related; boundary=${boundary}`,
+    payload: payload,
+    headers: { Authorization: `Bearer ${token}` },
+    muteHttpExceptions: true
+  });
+
+  const json = JSON.parse(res.getContentText());
+  if (!json.id) throw new Error('Drive upload succeeded but returned no file id.');
+  return json.id;
+}
+
+// ----- Helper: Pick densest sheet from Google Sheet -----
+function pickDensestSheet_(ss) {
+  const sheets = ss.getSheets();
+  if (!sheets.length) return null;
+  let best = sheets[0], bestCount = -1;
+  for (const sh of sheets) {
+    const vals = sh.getDataRange().getValues();
+    let count = 0;
+    for (const row of vals) for (const cell of row) if (cell !== '' && cell !== null) count++;
+    if (count > bestCount) { bestCount = count; best = sh; }
+  }
+  return best;
+}
+
+// ----- Helper: Export CSV -----
+function exportSheetAsCSV(filename, data) {
+  const csvContent = data.map(r => r.map(c => `"${c.toString().replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const folder = DriveApp.getFolderById(SAMS_FOLDER_ID);
+
+  // Delete old CSV if exists
+  const existingFiles = folder.getFilesByName(filename);
+  while(existingFiles.hasNext()) existingFiles.next().setTrashed(true);
+
+  folder.createFile(filename, csvContent, MimeType.CSV);
+}
+// ======= Purge Function =======
+function purgeFolder(folderId) {
+  try {
+    Logger.log(`Purging folder ${folderId}`);
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFiles();
+    let count = 0;
+    while (files.hasNext()) {
+      files.next().setTrashed(true);
+      count++;
+      Utilities.sleep(50);
+    }
+    Logger.log(`Purged ${count} files from folder ${folderId}`);
+    return `✅ Purged ${count} files from folder ${folderId}`;
+  } catch (e) {
+    Logger.log(`Error purging folder ${folderId}: ${e.message}`);
+    if (e.message.includes('getFolderById')) {
+      return `⚠️ Failed to purge folder ${folderId}: Invalid or inaccessible folder ID`;
+    }
+    return `⚠️ Failed to purge folder ${folderId}: ${e.message}`;
+  }
+}
+
+
+// ======= Purge Amazon Folder =======
+function purgeFolderAmazon() {
+  return purgeFolder(AMAZON_FOLDER_ID);
+}
+// ======= Purge Sam's Folder =======
+function purgeFolderSams() {
+  return purgeFolderWithLogging(SAMS_FOLDER_ID, "Sam's");
+}
+
+// Generic folder purge with logging
+function purgeFolderWithLogging(folderId, folderName = "Folder") {
+  try {
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFiles();
+    let count = 0;
+    let logMessages = [];
+    while (files.hasNext()) {
+      const file = files.next();
+      logMessages.push(`Trashing: ${file.getName()}`);
+      file.setTrashed(true);
+      count++;
+      Utilities.sleep(50); // small delay to avoid quota issues
+    }
+    Logger.log(`Purged ${count} files from ${folderName} (${folderId})`);
+    logMessages.push(`✅ Purged ${count} files from ${folderName}`);
+    return logMessages.join('\n');
+  } catch (e) {
+    Logger.log(`Error purging ${folderName}: ${e.message}`);
+    return `⚠️ Failed to purge ${folderName}: ${e.message}`;
+  }
+}
+
+
+// ======= Purge All PDFs =======
+function purgeAllPDFs() {
+  const allFolderIds = new Set([
+    ...tradingPartners.map(p => p.id),
+    ...shippingLabelPartners.map(p => p.id),
+    ...shippingManifestPartners.map(p => p.id),
+    // DDPOS_FOLDER_ID, // Uncomment when you have a valid ID
+    TRADING_PARTNER_DESTINATION_ID,
+    SHIPPING_LABEL_DESTINATION_ID,
+    SHIPPING_MANIFEST_DESTINATION_ID
+  ]);
+
+
+  let results = [];
+  allFolderIds.forEach(id => {
+    if (id && !id.match(/^(YOUR_|DDPOS_)/)) {
+      results.push(purgeFolder(id));
+    } else {
+      Logger.log(`Skipped invalid or placeholder folder ID: ${id}`);
+      results.push(`⚠️ Skipped invalid or placeholder folder ID: ${id}`);
+    }
+  });
+  return results.join('\n') || '✅ Purge completed (no valid folders processed)';
+}
+// ======= Format Spreadsheet =======
+function resetFormatting() {
+  const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY'); // your file ID
+  const sheet = ss.getSheetByName('Sheet1'); // adjust if sheet has a different name
+  if (!sheet) return '❌ Sheet not found';
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+
+  if (lastRow < 2) return '⚠️ No rows to reset';
+
+  sheet.getRange(2, 1, lastRow - 1, lastCol).setBackground(null);
+
+  return '✅ Formatting reset to default';
+}
+
+
+
+// ======= HTML Service Entrypoint =======
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('PDF and Spreadsheet Tools')
+    .setWidth(600)
+    .setHeight(400)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+}
+
