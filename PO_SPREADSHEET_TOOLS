@@ -3,31 +3,54 @@
 // ----- Menu setup -----
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('⚙️ DD Tools')
-    .addItem('--- 🧩 Conversion ---', 'doNothing')  // acts like a label
+
+  // Menu 1: Inbound (Import / Convert / Validate)
+  ui.createMenu('Inbound')
+    // Conversion
+    .addItem('--- 🔄 Conversion ---', 'doNothing')
     .addItem('Convert .neworders To .csv Import', 'renameNewordersToCSVInNeworderFilesAndImport')
     .addItem('Convert Sams Excel To .csv Import', 'convertSamsExcelToCSVAndImport')
-    .addItem('--- ✅ Validation ---', 'doNothing')  // acts like a label
+
+    // Validation
+    .addItem('--- ✅ Validation ---', 'doNothing')
     .addItem('Apply Weight to Column L', 'applyWeightFormula')
     .addItem('Fix Zip Codes in Column H', 'fixZipCodes')
     .addItem('Check Lowes/Home Depot Limits', 'checkLowesHomeDepotLimits')
-    .addItem('--- 🧩 Amazon Conversion ---', 'doNothing')  // acts like a label
+
+    // Amazon
+    .addItem('--- 📦 Amazon ---', 'doNothing')
     .addItem('Import Amazon', 'importPSAmazon')
     .addItem('Import Amazon (Any .txt)', 'importPSAmazonAnyTxt')
+    .addToUi();
+
+  // Menu 2: Outbound (Export / Combine)
+  ui.createMenu('Outbound')
+    // Home Depot
+    .addItem('--- 🏠 Home Depot ---', 'doNothing')
+    .addItem('Export To: document-PS-homedepot', 'exportPSHomeDepot')
+    .addItem('Export To: document-PS-homedepot-thurs', 'exportPSHomeDepotThurs')
+    .addItem('Export To: document-PS-homedepot-sun', 'exportPSHomeDepotSun')
+
+    // Lowes
+    .addItem('--- 🏬 Lowes ---', 'doNothing')
+    .addItem('Export To: document-PS-lowes', 'exportPSLowes')
+    .addItem('Export To: document-PS-lowes-thurs', 'exportPSLowesThurs')
+    .addItem('Export To: document-PS-lowes-sun', 'exportPSLowesSun')
+
+    // Sams
+    .addItem('--- 🛒 Sams ---', 'doNothing')
+    .addItem('Export To: document-PS-sams', 'exportPSSams')
+    .addItem('Export To: document-PS-sams-thurs', 'exportPSSamsThurs')
+    .addItem('Export To: document-PS-sams-sun', 'exportPSSamsSun')
+
+    // Amazon
+    .addItem('--- 📦 Amazon ---', 'doNothing')
     .addItem('Export Amazon', 'exportPSAmazon')
     .addItem('Export Amazon Thurs', 'exportPSAmazonThurs')
     .addItem('Export Amazon Sun', 'exportPSAmazonSun')
-    .addItem('--- ⬆ Export CSVs ---', 'doNothing')  // acts like a label
-    .addItem('Export To: document-PS-homedepot', 'exportPSHomeDepot')
-    .addItem('Export To: document-PS-lowes', 'exportPSLowes')
-    .addItem('Export To: document-PS-sams', 'exportPSSams')
-    .addItem('Export To: document-PS-homedepot-thurs', 'exportPSHomeDepotThurs')
-    .addItem('Export To: document-PS-homedepot-sun', 'exportPSHomeDepotSun')
-    .addItem('Export To: document-PS-lowes-thurs', 'exportPSLowesThurs')
-    .addItem('Export To: document-PS-lowes-sun', 'exportPSLowesSun')
-    .addItem('Export To: document-PS-sams-thurs', 'exportPSSamsThurs')
-    .addItem('Export To: document-PS-sams-sun', 'exportPSSamsSun')
-    .addItem('--- 🔗 Combine CSVs ---', 'doNothing')  // acts like a label
+
+    // Combine
+    .addItem('--- 🔗 Combine CSVs ---', 'doNothing')
     .addItem('Combine Daily CSV Files (document-PS-combined)', 'combineCSVFiles')
     .addItem('Combine Weekend CSV Files (document-PS-combined-sun)', 'combineSundayCSVFiles')
     .addToUi();
