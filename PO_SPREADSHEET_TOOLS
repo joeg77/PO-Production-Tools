@@ -426,8 +426,9 @@ function convertSamsExcelToCSVAndImport() {
   const baseFolderName = 'PO Production';
   const orderFolderName = 'Order Files';
   const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  const targetSheetName = 'Sheet1';
 
-  // Find base folder
+  // --- Find base folder ---
   const baseFolders = DriveApp.getFoldersByName(baseFolderName);
   if (!baseFolders.hasNext()) {
     SpreadsheetApp.getUi().alert(`Folder "${baseFolderName}" not found.`);
@@ -435,7 +436,7 @@ function convertSamsExcelToCSVAndImport() {
   }
   const baseFolder = baseFolders.next();
 
-  // Find order folder
+  // --- Find order folder ---
   const orderFolders = baseFolder.getFoldersByName(orderFolderName);
   if (!orderFolders.hasNext()) {
     SpreadsheetApp.getUi().alert(`Folder "${orderFolderName}" not found inside "${baseFolderName}".`);
@@ -443,26 +444,25 @@ function convertSamsExcelToCSVAndImport() {
   }
   const orderFolder = orderFolders.next();
 
-  // Find first .xlsx file
+  // --- Find first .xlsx file ---
   let files = orderFolder.getFiles();
   let file = null;
   while (files.hasNext()) {
     let f = files.next();
     if (f.getName().toLowerCase().endsWith('.xlsx')) {
       file = f;
-      break; // stop at first .xlsx file found
+      break;
     }
   }
-
   if (!file) {
     SpreadsheetApp.getUi().alert(`No .xlsx file found in "${orderFolderName}".`);
     return;
   }
 
-  // Convert Excel to Google Sheet
+  // --- Convert Excel to Google Sheet ---
   const convertedSheetId = uploadExcelAsGoogleSheet_(file.getBlob(), 'TempImportFile');
 
-  // ✅ Delete (trash) the original Excel file
+  // --- Delete the original Excel file ---
   file.setTrashed(true);
 
   const sh = SpreadsheetApp.openById(convertedSheetId);
@@ -473,7 +473,7 @@ function convertSamsExcelToCSVAndImport() {
     return;
   }
 
-  // Export tab as CSV
+  // --- Export tab as CSV ---
   const csvBlob = exportSheetToCsvBlob_(
     convertedSheetId,
     targetTab.getSheetId(),
@@ -481,28 +481,18 @@ function convertSamsExcelToCSVAndImport() {
   );
   orderFolder.createFile(csvBlob);
 
-  // Parse CSV properly
-  const csvString = csvBlob.getDataAsString();
-  const csvData = csvString
-    .split('\n')
-    .filter(line => line.trim() !== '')        // skip empty lines
-    .map(line => Utilities.parseCsv(line)[0]); // parse each line
+  // --- Import CSV robustly into Google Sheet ---
+  const targetSS = SpreadsheetApp.openById(spreadsheetId);
+  const targetSheet = targetSS.getSheetByName(targetSheetName);
 
-  if (csvData.length > 0) {
-    const targetSS = SpreadsheetApp.openById(spreadsheetId);
-    const targetSheet = targetSS.getSheets()[0];
-    targetSheet.clearContents();
-
-    // Normalize rows to have same number of columns
-    const maxCols = Math.max(...csvData.map(r => r.length));
-    const normalizedData = csvData.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
-
-    const r = targetSheet.getRange(1, 1, normalizedData.length, maxCols);
-    r.setNumberFormat('@');
-    r.setValues(normalizedData);
+  if (!targetSheet) {
+    SpreadsheetApp.getUi().alert(`❌ Target sheet "${targetSheetName}" not found.`);
+    return;
   }
 
-  // Clean up temporary converted Google Sheet
+  importCsvBlobToSheet(csvBlob, targetSheet);
+
+  // --- Delete temporary Google Sheet ---
   DriveApp.getFileById(convertedSheetId).setTrashed(true);
 
   SpreadsheetApp.getUi().alert(
@@ -510,6 +500,44 @@ function convertSamsExcelToCSVAndImport() {
   );
 }
 
+// --- Helper function to robustly import CSV Blob ---
+function importCsvBlobToSheet(csvBlob, targetSheet) {
+  const csvString = csvBlob.getDataAsString();
+  const lines = csvString.split(/\r?\n/).filter(line => line.trim() !== '');
+  const csvData = lines.map(line => Utilities.parseCsv(line)[0]);
+  if (csvData.length === 0) return;
+
+  // Ensure all rows have the same number of columns
+  const maxCols = Math.max(...csvData.map(r => r.length));
+  const normalizedData = csvData.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
+
+  targetSheet.clearContents();
+  const range = targetSheet.getRange(1, 1, normalizedData.length, maxCols);
+  range.setNumberFormat('@');
+  range.setValues(normalizedData);
+}
+
+
+
+
+
+
+// --- Helper function to robustly import CSV Blob ---
+function importCsvBlobToSheet(csvBlob, targetSheet) {
+  const csvString = csvBlob.getDataAsString();
+  const lines = csvString.split(/\r?\n/).filter(line => line.trim() !== '');
+  const csvData = lines.map(line => Utilities.parseCsv(line)[0]);
+  if (csvData.length === 0) return;
+
+  // Ensure all rows have the same number of columns
+  const maxCols = Math.max(...csvData.map(r => r.length));
+  const normalizedData = csvData.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
+
+  targetSheet.clearContents();
+  const range = targetSheet.getRange(1, 1, normalizedData.length, maxCols);
+  range.setNumberFormat('@');
+  range.setValues(normalizedData);
+}
 
 
 // ----------------- Helpers from Script 2 -----------------
