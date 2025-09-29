@@ -425,42 +425,92 @@ function renameNewordersToCSVInNeworderFilesAndImport() {
 function convertSamsExcelToCSVAndImport() {
   const baseFolderName = 'PO Production';
   const orderFolderName = 'Order Files';
-  const targetFileName = 'document-PS-sams.xlsx';
   const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
 
+  // Find base folder
   const baseFolders = DriveApp.getFoldersByName(baseFolderName);
-  if (!baseFolders.hasNext()) { SpreadsheetApp.getUi().alert(`Folder "${baseFolderName}" not found.`); return; }
+  if (!baseFolders.hasNext()) {
+    SpreadsheetApp.getUi().alert(`Folder "${baseFolderName}" not found.`);
+    return;
+  }
   const baseFolder = baseFolders.next();
 
+  // Find order folder
   const orderFolders = baseFolder.getFoldersByName(orderFolderName);
-  if (!orderFolders.hasNext()) { SpreadsheetApp.getUi().alert(`Folder "${orderFolderName}" not found inside "${baseFolderName}".`); return; }
+  if (!orderFolders.hasNext()) {
+    SpreadsheetApp.getUi().alert(`Folder "${orderFolderName}" not found inside "${baseFolderName}".`);
+    return;
+  }
   const orderFolder = orderFolders.next();
 
-  const files = orderFolder.getFilesByName(targetFileName);
-  if (!files.hasNext()) { SpreadsheetApp.getUi().alert(`File "${targetFileName}" not found in "${orderFolderName}".`); return; }
-  const file = files.next();
-
-  const convertedSheetId = uploadExcelAsGoogleSheet_(file.getBlob(), 'TempImportFile');
-  const sh = SpreadsheetApp.openById(convertedSheetId);
-  const targetTab = pickDensestSheet_(sh);
-  if (!targetTab) { DriveApp.getFileById(convertedSheetId).setTrashed(true); SpreadsheetApp.getUi().alert('❌ No sheets found in converted workbook.'); return; }
-
-  const csvBlob = exportSheetToCsvBlob_(convertedSheetId, targetTab.getSheetId(), 'document-PS-sams.csv');
-  orderFolder.createFile(csvBlob);
-
-  const csvData = Utilities.parseCsv(csvBlob.getDataAsString());
-  const targetSS = SpreadsheetApp.openById(spreadsheetId);
-  const targetSheet = targetSS.getSheets()[0];
-  targetSheet.clearContents();
-  if (csvData.length > 0) {
-    const r = targetSheet.getRange(1, 1, csvData.length, csvData[0].length);
-    r.setNumberFormat('@');
-    r.setValues(csvData);
+  // Find first .xlsx file
+  let files = orderFolder.getFiles();
+  let file = null;
+  while (files.hasNext()) {
+    let f = files.next();
+    if (f.getName().toLowerCase().endsWith('.xlsx')) {
+      file = f;
+      break; // stop at first .xlsx file found
+    }
   }
 
+  if (!file) {
+    SpreadsheetApp.getUi().alert(`No .xlsx file found in "${orderFolderName}".`);
+    return;
+  }
+
+  // Convert Excel to Google Sheet
+  const convertedSheetId = uploadExcelAsGoogleSheet_(file.getBlob(), 'TempImportFile');
+
+  // ✅ Delete (trash) the original Excel file
+  file.setTrashed(true);
+
+  const sh = SpreadsheetApp.openById(convertedSheetId);
+  const targetTab = pickDensestSheet_(sh);
+  if (!targetTab) {
+    DriveApp.getFileById(convertedSheetId).setTrashed(true);
+    SpreadsheetApp.getUi().alert('❌ No sheets found in converted workbook.');
+    return;
+  }
+
+  // Export tab as CSV
+  const csvBlob = exportSheetToCsvBlob_(
+    convertedSheetId,
+    targetTab.getSheetId(),
+    file.getName().replace(/\.xlsx$/i, '.csv')
+  );
+  orderFolder.createFile(csvBlob);
+
+  // Parse CSV properly
+  const csvString = csvBlob.getDataAsString();
+  const csvData = csvString
+    .split('\n')
+    .filter(line => line.trim() !== '')        // skip empty lines
+    .map(line => Utilities.parseCsv(line)[0]); // parse each line
+
+  if (csvData.length > 0) {
+    const targetSS = SpreadsheetApp.openById(spreadsheetId);
+    const targetSheet = targetSS.getSheets()[0];
+    targetSheet.clearContents();
+
+    // Normalize rows to have same number of columns
+    const maxCols = Math.max(...csvData.map(r => r.length));
+    const normalizedData = csvData.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
+
+    const r = targetSheet.getRange(1, 1, normalizedData.length, maxCols);
+    r.setNumberFormat('@');
+    r.setValues(normalizedData);
+  }
+
+  // Clean up temporary converted Google Sheet
   DriveApp.getFileById(convertedSheetId).setTrashed(true);
-  SpreadsheetApp.getUi().alert(`✅ "${targetFileName}" converted to CSV (tab: "${targetTab.getName()}") and imported.`);
+
+  SpreadsheetApp.getUi().alert(
+    `✅ "${file.getName()}" converted to CSV (tab: "${targetTab.getName()}") and imported. Original Excel deleted.`
+  );
 }
+
+
 
 // ----------------- Helpers from Script 2 -----------------
 
