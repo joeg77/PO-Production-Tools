@@ -17,6 +17,7 @@ function onOpen() {
     .addItem('Apply Weight to Column L', 'applyWeightFormula')
     .addItem('Fix Zip Codes in Column H', 'fixZipCodes')
     .addItem('Check Lowes/Home Depot Limits', 'checkLowesHomeDepotLimits')
+    .addToUi();
 
   // Menu 2: Outbound (Export / Combine)
   ui.createMenu('Outbound')
@@ -683,5 +684,3 @@ function clearSheet() {
 
   SpreadsheetApp.getUi().alert('✅ Spreadsheet has been restored.');
 }
-
-
