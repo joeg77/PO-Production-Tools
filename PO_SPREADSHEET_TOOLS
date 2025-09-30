@@ -8,20 +8,15 @@ function onOpen() {
   ui.createMenu('Inbound')
     // Conversion
     .addItem('--- 🔄 Conversion ---', 'doNothing')
-    .addItem('Convert .neworders To .csv Import', 'renameNewordersToCSVInNeworderFilesAndImport')
-    .addItem('Convert Sams Excel To .csv Import', 'convertSamsExcelToCSVAndImport')
+    .addItem('Convert and import .neworders file', 'renameNewordersToCSVInNeworderFilesAndImport')
+    .addItem('Convert and import Excel to .csv file', 'convertSamsExcelToCSVAndImport')
+    .addItem('Convert Amazon txt file to .csv', 'importPSAmazonAnyTxt')
 
     // Validation
     .addItem('--- ✅ Validation ---', 'doNothing')
     .addItem('Apply Weight to Column L', 'applyWeightFormula')
     .addItem('Fix Zip Codes in Column H', 'fixZipCodes')
     .addItem('Check Lowes/Home Depot Limits', 'checkLowesHomeDepotLimits')
-
-    // Amazon
-    .addItem('--- 📦 Amazon ---', 'doNothing')
-    .addItem('Import Amazon', 'importPSAmazon')
-    .addItem('Import Amazon (Any .txt)', 'importPSAmazonAnyTxt')
-    .addToUi();
 
   // Menu 2: Outbound (Export / Combine)
   ui.createMenu('Outbound')
@@ -53,6 +48,12 @@ function onOpen() {
     .addItem('--- 🔗 Combine CSVs ---', 'doNothing')
     .addItem('Combine Daily CSV Files (document-PS-combined)', 'combineCSVFiles')
     .addItem('Combine Weekend CSV Files (document-PS-combined-sun)', 'combineSundayCSVFiles')
+    .addToUi();
+
+  // Menu 3: Sheet Tools
+  ui.createMenu('Sheet Tools')
+    .addItem('Reset Formatting', 'resetFormatting')
+    .addItem('Delete Sheet', 'clearSheet')
     .addToUi();
 }
 
@@ -639,3 +640,48 @@ function checkLowesHomeDepotLimits() {
     SpreadsheetApp.getUi().alert('✅ All Lowes and Home Depot rows are within limits.');
   }
 }
+// --- Reset formatting only (keeps data) ---
+function resetFormatting() {
+  const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY');
+  const sheet = ss.getSheetByName('Sheet1');
+  if (!sheet) return SpreadsheetApp.getUi().alert('❌ Sheet1 not found');
+
+  // Remove conditional formatting rules
+  sheet.setConditionalFormatRules([]);
+
+  // Clear all formats in the entire sheet
+  sheet.clearFormats();
+
+  // Reset number formats and alignment
+  const range = sheet.getDataRange();
+  range.setNumberFormat('@'); // plain text
+  range.setHorizontalAlignment('left');
+  range.setVerticalAlignment('middle');
+
+  // Remove borders
+  range.setBorder(false, false, false, false, false, false);
+
+  SpreadsheetApp.getUi().alert('✅ Sheet formatting fully reset');
+}
+
+// --- Clear everything in Sheet1 ---
+function clearSheet() {
+  const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY');
+  const sheetName = 'Sheet1';
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet) return SpreadsheetApp.getUi().alert('❌ The sheet was not found.');
+
+  // Insert temporary sheet
+  const tempSheet = ss.insertSheet('TempSheet');
+
+  // Delete the original sheet
+  ss.deleteSheet(sheet);
+
+  // Rename temporary sheet to original name
+  tempSheet.setName(sheetName);
+
+  SpreadsheetApp.getUi().alert('✅ Spreadsheet has been restored.');
+}
+
+
