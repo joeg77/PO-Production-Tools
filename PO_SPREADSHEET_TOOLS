@@ -9,7 +9,8 @@ function onOpen() {
     // Conversion
     .addItem('--- 🔄 Conversion ---', 'doNothing')
     .addItem('Convert and import .neworders file', 'renameNewordersToCSVInNeworderFilesAndImport')
-    .addItem('Convert and import Excel to .csv file', 'convertSamsExcelToCSVAndImport')
+    .addItem('Rename Dig Defence Spreadsheet', 'renameCSVtoDocumentPSDD')
+    .addItem('Convert and rename Sams Spreadsheet to .csv', 'convertSamsExcelToCSVAndImport')
     .addItem('Convert Amazon txt file to .csv', 'importPSAmazonAnyTxt')
 
     // Validation
@@ -64,7 +65,7 @@ function doNothing() {}
 // =================== SCRIPT 1 FUNCTIONS ===================
 
 // Apply weight mapping
-function applyWeightFormula() {
+function applyWeightFormula(silent) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const data = sheet.getRange("M2:M" + sheet.getLastRow()).getValues();
   const weightMap = {
@@ -97,14 +98,14 @@ function applyWeightFormula() {
   });
 
   sheet.getRange(2, 12, output.length, 1).setValues(output);
-  SpreadsheetApp.getUi().alert('✅ Weights applied to Column L.');
+  if (!silent) SpreadsheetApp.getUi().alert('✅ Weights applied to Column L.');
 }
 
 // Fix zip codes
-function fixZipCodes() {
+function fixZipCodes(silent) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) { SpreadsheetApp.getUi().alert('No rows to process.'); return; }
+  if (lastRow < 2) { if (!silent) SpreadsheetApp.getUi().alert('No rows to process.'); return; }
   const range = sheet.getRange(2, 8, lastRow - 1);
   const values = range.getValues();
   sheet.getRange(2, 8, lastRow - 1).setNumberFormat('@STRING@');
@@ -119,7 +120,53 @@ function fixZipCodes() {
   });
 
   range.setValues(fixed);
-  SpreadsheetApp.getUi().alert('✅ Zip codes are fixed!');
+  if (!silent) SpreadsheetApp.getUi().alert('✅ Zip codes are fixed!');
+}
+
+// Check Lowes/Home Depot limits
+function checkLowesHomeDepotLimits(silent) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets();
+  let alertMessages = [];
+
+  sheets.forEach(sheet => {
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).setBackground(null);
+
+    const colL = sheet.getRange(2, 12, lastRow - 1, 1).getValues();
+    const colQ = sheet.getRange(2, 17, lastRow - 1, 1).getValues();
+    const colV = sheet.getRange(2, 22, lastRow - 1, 1).getValues();
+
+    for (let i = 0; i < colL.length; i++) {
+      const store = String(colV[i][0]).trim().toLowerCase();
+      let maxRowWeight = null;
+      if (store === 'lowes') maxRowWeight = 450;
+      else if (store === 'thehomedepot') maxRowWeight = 500;
+      else continue;
+
+      const weight = Number(String(colL[i][0]).trim()) || 0;
+      const packs = Number(String(colQ[i][0]).trim()) || 0;
+      const rowTotalWeight = weight * packs;
+
+      let rowAlerts = [];
+      if (rowTotalWeight > maxRowWeight) rowAlerts.push(`weight (${rowTotalWeight} > ${maxRowWeight})`);
+      if (packs > 25) rowAlerts.push(`packs (${packs} > 25)`);
+
+      if (rowAlerts.length > 0) {
+        alertMessages.push(`Current Sheet: Row ${i + 2} exceeds ${rowAlerts.join(' and ')}`);
+        sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBackground('#F8D7DA');
+      }
+    }
+  });
+
+  if (!silent) {
+    if (alertMessages.length > 0) SpreadsheetApp.getUi().alert('⚠️ Alerts:\n' + alertMessages.join('\n'));
+    else SpreadsheetApp.getUi().alert('✅ All Lowes and Home Depot rows are within limits.');
+  }
+
+  return alertMessages.length; // returns number of alerts
 }
 
 // Export functions
@@ -134,9 +181,44 @@ function exportPSSams() { exportActiveSheetAsCSV('document-PS-sams.csv'); }
 function exportPSSamsThurs() { exportActiveSheetAsCSV('document-PS-sams-thurs.csv'); }
 function exportPSSamsSun() { exportActiveSheetAsCSV('document-PS-sams-sun.csv'); }
 
-function exportPSAmazon() { exportActiveSheetAsCSV('document-PS-amazon.csv'); }
-function exportPSAmazonThurs() { exportActiveSheetAsCSV('document-PS-amazon-thurs.csv'); }
-function exportPSAmazonSun() { exportActiveSheetAsCSV('document-PS-amazon-sun.csv'); }
+function exportPSAmazonUserChoice() {
+  const html = HtmlService.createHtmlOutput(`
+    <p>Choose which folder to save the Amazon CSV:</p>
+    <button onclick="google.script.run.withSuccessHandler(() => google.script.host.close()).saveCSV('desktop')">Desktop</button>
+    <button onclick="google.script.run.withSuccessHandler(() => google.script.host.close()).saveCSV('mobile')">Mobile</button>
+    <button onclick="google.script.host.close()">Cancel</button>
+  `)
+  .setWidth(250)
+  .setHeight(150);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Select Folder');
+}
+
+function saveCSV(folderChoice) {
+  const filename = 'document-PS-amazon.csv'; // adjust for Thurs/Sun if needed
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const csvContent = convertRangeToCsv(sheet);
+  const blob = Utilities.newBlob(csvContent, "text/csv", filename);
+
+  let folderId;
+  if (folderChoice === 'desktop') folderId = '1JKbS5nnUcnFgyc8WJzcPQd1aBJLp1uxz';
+  else if (folderChoice === 'mobile') folderId = '1D67NuVHGp9ESn9BIwsUiGPr10-531J8O';
+  else return;
+
+  const folder = DriveApp.getFolderById(folderId);
+
+  const existingFiles = folder.getFilesByName(filename);
+  while (existingFiles.hasNext()) existingFiles.next().setTrashed(true);
+
+  folder.createFile(blob);
+  SpreadsheetApp.getUi().alert(`📄 '${filename}' saved to folder: ${folder.getName()}`);
+}
+
+// Menu functions
+function exportPSAmazon() { exportPSAmazonUserChoice(); }
+function exportPSAmazonThurs() { exportPSAmazonUserChoice(); }
+function exportPSAmazonSun() { exportPSAmazonUserChoice(); }
+
 
 // Save active sheet as CSV
 function exportActiveSheetAsCSV(filename) {
@@ -309,36 +391,16 @@ function importPSAmazon() {
 }
 
 // Import first .txt Amazon file found in Order Files folder
+// ======= Amazon CSV Renaming =======
 function importPSAmazonAnyTxt() {
-  const folderId = '1P4RNXSlls4BJb2n7hvFUJxUSi_TX9O31';  // Amazon order files folder
-  const folder = DriveApp.getFolderById(folderId);
-
-  const files = folder.getFiles();
-  let txtFile = null;
-
-  while (files.hasNext()) {
-    const f = files.next();
-    if (f.getName().toLowerCase().endsWith('.txt')) {
-      txtFile = f;
-      break;
-    }
-  }
-
-  if (!txtFile) {
-    SpreadsheetApp.getUi().alert('❌ No .txt file found in Amazon folder.');
-    return;
-  }
-
-  const txtContent = txtFile.getBlob().getDataAsString();
-  const rows = txtContent.trim().split(/\r?\n/).map(line => line.split('\t'));
-  if (rows.length < 2) {
-    SpreadsheetApp.getUi().alert('❌ File appears empty or invalid.');
-    return;
-  }
-
+  const folderIds = [
+    '1JKbS5nnUcnFgyc8WJzcPQd1aBJLp1uxz',
+    '1D67NuVHGp9ESn9BIwsUiGPr10-531J8O'
+  ];
+  
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   sheet.clearContents();
-
+  
   const targetHeaders = [
     "PKG_PACKAGE_ID","SHPTO_NAME","SHPTO_ADDRESS_1","SHPTO_ADDRESS_2","SHPTO_ADDRESS_3",
     "SHPTO_CITY","SHPTO_STATE_PROV","SHPTO_POSTAL_CODE","SHPTO_COUNTRY_ID","SHPTO_TELEPHONE",
@@ -347,28 +409,57 @@ function importPSAmazonAnyTxt() {
     "SHPTO_COMPANY","MERCHANT_ID"
   ];
   sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+  
+  let totalRows = 0;
 
-  const dataRows = rows.slice(1);
-  const colMapping = [
-    [0, 0],  [1, 13], [8, 1],  [10, 9], [11, 12], [13, 16],
-    [18, 2], [19, 3], [20, 4], [21, 5], [22, 6],  [23, 7], [24, 8]
-  ];
+  folderIds.forEach(folderId => {
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFiles();
+    let txtFile = null;
 
-  const output = dataRows.map(row => {
-    let newRow = new Array(targetHeaders.length).fill('');
-    colMapping.forEach(([src, dest]) => newRow[dest] = row[src] || '');
-    newRow[21] = "Amazon"; // MERCHANT_ID
-    return newRow;
+    while (files.hasNext()) {
+      const f = files.next();
+      if (f.getName().toLowerCase().endsWith('.txt')) {
+        txtFile = f;
+        break; // only first TXT per folder
+      }
+    }
+
+    if (!txtFile) {
+      Logger.log(`❌ No .txt file found in folder "${folder.getName()}"`);
+      return;
+    }
+
+    const txtContent = txtFile.getBlob().getDataAsString();
+    const rows = txtContent.trim().split(/\r?\n/).map(line => line.split('\t'));
+    if (rows.length < 2) {
+      Logger.log(`❌ File appears empty or invalid: "${txtFile.getName()}"`);
+      return;
+    }
+
+    const dataRows = rows.slice(1);
+    const colMapping = [
+      [0, 0],  [1, 13], [8, 1],  [10, 9], [11, 12], [13, 16],
+      [18, 2], [19, 3], [20, 4], [21, 5], [22, 6],  [23, 7], [24, 8]
+    ];
+
+    const output = dataRows.map(row => {
+      let newRow = new Array(targetHeaders.length).fill('');
+      colMapping.forEach(([src, dest]) => newRow[dest] = row[src] || '');
+      newRow[21] = "Amazon"; // MERCHANT_ID
+      return newRow;
+    });
+
+    if (output.length > 0) {
+      sheet.getRange(totalRows + 2, 1, output.length, targetHeaders.length).setValues(output);
+      totalRows += output.length;
+      Logger.log(`✅ Imported "${txtFile.getName()}" with ${output.length} rows`);
+    }
   });
 
-  if (output.length > 0) {
-    sheet.getRange(2, 1, output.length, targetHeaders.length).setValues(output);
-  }
-
-  SpreadsheetApp.getUi().alert(
-    `✅ Amazon import complete from "${txtFile.getName()}". Rows imported: ${output.length}.`
-  );
+  SpreadsheetApp.getUi().alert(`✅ Amazon import complete. Total rows imported: ${totalRows}`);
 }
+
 
 // =================== SCRIPT 2 FUNCTIONS ===================
 
@@ -392,12 +483,9 @@ function renameNewordersToCSVInNeworderFilesAndImport() {
   while (files.hasNext()) {
     const file = files.next();
     const name = file.getName();
-    Logger.log("Found file: " + name);
 
     if (name.toLowerCase().endsWith('.neworders')) {
       const newName = name.replace(/\.neworders$/i, '.csv');
-      Logger.log("Renaming to: " + newName);
-
       const blob = file.getBlob().setName(newName);
       neworderFolder.createFile(blob);
       file.setTrashed(true);
@@ -409,19 +497,21 @@ function renameNewordersToCSVInNeworderFilesAndImport() {
       sheet.clearContents();
 
       const csvData = Utilities.parseCsv(blob.getDataAsString("UTF-8"));
-      Logger.log("Rows parsed: " + csvData.length + " x " + (csvData[0] ? csvData[0].length : 0));
-
       if (csvData.length > 0) {
         sheet.getRange(1, 1, csvData.length, csvData[0].length).setValues(csvData);
+
+        // Run processing only if there is data
+        //applyWeightFormula();
+        //fixZipCodes();
+        //checkLowesHomeDepotLimits();
       }
+
       renamedCount++;
     }
   }
 
-  Logger.log("Total renamed: " + renamedCount);
-  SpreadsheetApp.getUi().alert(`✅ ${renamedCount} file(s) renamed and imported into "Sheet1".`);
+  SpreadsheetApp.getUi().alert(`✅ ${renamedCount} file(s) renamed, imported, and processed.`);
 }
-
 
 // Convert document-PS-sams.xlsx → CSV → import
 function convertSamsExcelToCSVAndImport() {
@@ -519,8 +609,42 @@ function importCsvBlobToSheet(csvBlob, targetSheet) {
   range.setValues(normalizedData);
 }
 
+//=============== Dig Defence Spreadsheet Rename ================
 
+function renameCSVtoDocumentPSDD() {
+  const folderIds = [
+    '1xJJA6uJlSEJC2s9spfn0ShWwWCx3v4Qi',
+    '1YScXpnNqJSjWM4tdxna95YqI0D9hzknJ'
+  ];
+  const newName = "document-PS-dd.csv";
+  let renamedCount = 0;
 
+  folderIds.forEach(folderId => {
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFiles(); // iterate all files
+
+    while (files.hasNext()) {
+      const file = files.next();
+      const lowerName = file.getName().toLowerCase();
+
+      if (lowerName.endsWith('.csv')) {
+        // Trash existing file
+        const existingFiles = folder.getFilesByName(newName);
+        while (existingFiles.hasNext()) existingFiles.next().setTrashed(true);
+
+        // Create renamed copy and trash original
+        folder.createFile(file.getBlob().setName(newName));
+        file.setTrashed(true);
+
+        renamedCount++;
+        Logger.log(`Renamed "${file.getName()}" → "${newName}" in folder "${folder.getName()}"`);
+        break; // only first CSV per folder
+      }
+    }
+  });
+
+  Logger.log(`✅ Total files renamed: ${renamedCount}`);
+}
 
 
 
@@ -589,58 +713,7 @@ function pickDensestSheet_(ss) {
   return best;
 }
 
-function checkLowesHomeDepotLimits() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = ss.getSheets();
 
-  let alertMessages = [];
-
-  sheets.forEach(sheet => {
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return; // no data
-
-    // Clear previous highlights
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).setBackground(null);
-
-    // Grab relevant columns:
-    const colL = sheet.getRange(2, 12, lastRow - 1, 1).getValues(); // L = weight
-    const colQ = sheet.getRange(2, 17, lastRow - 1, 1).getValues(); // Q = packs
-    const colV = sheet.getRange(2, 22, lastRow - 1, 1).getValues(); // V = store identifier
-
-    for (let i = 0; i < colL.length; i++) {
-      const store = String(colV[i][0]).trim().toLowerCase();
-
-      let maxRowWeight = null;
-      if (store === 'lowes') {
-        maxRowWeight = 450;
-      } else if (store === 'thehomedepot') {
-        maxRowWeight = 500;
-      } else {
-        continue; // skip rows not Lowes or Home Depot
-      }
-
-      const weight = Number(String(colL[i][0]).trim()) || 0;
-      const packs = Number(String(colQ[i][0]).trim()) || 0;
-      const rowTotalWeight = weight * packs;
-
-      let rowAlerts = [];
-      if (rowTotalWeight > maxRowWeight) rowAlerts.push(`weight (${rowTotalWeight} > ${maxRowWeight})`);
-      if (packs > 25) rowAlerts.push(`packs (${packs} > 25)`);
-
-      if (rowAlerts.length > 0) {
-        alertMessages.push(`${sheet.getName()}: Row ${i + 2} exceeds ${rowAlerts.join(' and ')}`);
-        // Highlight the row pale red
-        sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBackground('#F8D7DA');
-      }
-    }
-  });
-
-  if (alertMessages.length > 0) {
-    SpreadsheetApp.getUi().alert('⚠️ Alerts:\n' + alertMessages.join('\n'));
-  } else {
-    SpreadsheetApp.getUi().alert('✅ All Lowes and Home Depot rows are within limits.');
-  }
-}
 // --- Reset formatting only (keeps data) ---
 function resetFormatting() {
   const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY');
