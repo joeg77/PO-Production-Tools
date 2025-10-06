@@ -8,6 +8,7 @@ const ui = SpreadsheetApp.getUi();
 ui.createMenu('Inbound')
 // Conversion
 .addItem('--- 🔄 Conversion ---', 'doNothing')
+.addItem('Dig Defence Import', 'digDefence')
 .addItem("Lowe's New Orders Import", 'importLowesNeworders')
 .addItem("Home Depot New Orders Import", 'importHomeDepotNeworders')
 .addItem('Convert and import Excel to .csv file', 'convertSamsExcelToCSVAndImport')
@@ -22,6 +23,11 @@ ui.createMenu('Inbound')
 
 // Menu 2: Outbound (Export / Combine)
 ui.createMenu('Outbound')
+//Dig Defence
+.addItem('---  Dig Defence ---', 'doNothing')
+.addItem('Export To: document-PS-dd', 'document_PS_dd')
+.addItem('Export To: document-PS-dd-thurs', 'document_PS_dd_thurs')
+.addItem('Export To: document-PS-dd-sun', 'document_PS_dd_sun')
 // Home Depot
 .addItem('--- 🏠 Home Depot ---', 'doNothing')
 .addItem('Export To: document-PS-homedepot', 'exportPSHomeDepot')
@@ -63,6 +69,97 @@ ui.createMenu('Sheet Tools')
 function doNothing() {}
 
 // =================== SCRIPT 1 FUNCTIONS ===================
+// === STEP 1: Dig Defence CSV Import ===
+// ========== DIG DEFENCE IMPORT ==========
+function digDefence() {
+  const folderId = '1xJJA6uJlSEJC2s9spfn0ShWwWCx3v4Qi'; // Import folder ID
+  const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  const targetSheetName = 'Sheet1'; // Replace if your Dig Defence tab is named differently
+
+  const folder = DriveApp.getFolderById(folderId);
+  const files = folder.getFilesByType(MimeType.CSV);
+  if (!files.hasNext()) {
+    SpreadsheetApp.getUi().alert('❌ No CSV file found in the Dig Defence folder.');
+    return;
+  }
+
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = ss.getSheetByName(targetSheetName);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert(`❌ Sheet "${targetSheetName}" not found.`);
+    return;
+  }
+
+  // Import the first CSV file found
+  const file = files.next();
+  const csvData = Utilities.parseCsv(file.getBlob().getDataAsString());
+  if (csvData.length === 0) {
+    SpreadsheetApp.getUi().alert(`❌ CSV file "${file.getName()}" is empty.`);
+    return;
+  }
+
+  // Clear and import
+  sheet.clearContents();
+  sheet.getRange(1, 1, csvData.length, csvData[0].length).setValues(csvData);
+  SpreadsheetApp.getUi().alert(`✅ Imported "${file.getName()}" into "${targetSheetName}".`);
+}
+
+// ========== DIG DEFENCE EXPORT HELPERS ==========
+function exportActiveSheetToFolder(filename, folderId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getActiveSheet();
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('❌ No active sheet selected.');
+    return;
+  }
+
+  const csvContent = convertRangeToCsv(sheet);
+  if (!csvContent.trim()) {
+    SpreadsheetApp.getUi().alert('❌ The sheet is empty, nothing to export.');
+    return;
+  }
+
+  const blob = Utilities.newBlob(csvContent, 'text/csv', filename);
+  const folder = DriveApp.getFolderById(folderId);
+
+  // Remove any existing file with same name
+  const existingFiles = folder.getFilesByName(filename);
+  while (existingFiles.hasNext()) existingFiles.next().setTrashed(true);
+
+  folder.createFile(blob);
+  SpreadsheetApp.getUi().alert(`✅ '${filename}' saved to Drive folder: ${folder.getName()}`);
+}
+
+// ========== DIG DEFENCE EXPORT FUNCTIONS ==========
+function document_PS_dd() {
+  exportActiveSheetToFolder('document-PS-dd.csv', '1P4RNXSlls4BJb2n7hvFUJxUSi_TX9O31');
+}
+
+function document_PS_dd_thurs() {
+  exportActiveSheetToFolder('document-PS-dd-thurs.csv', '1P4RNXSlls4BJb2n7hvFUJxUSi_TX9O31');
+}
+
+function document_PS_dd_sun() {
+  exportActiveSheetToFolder('document-PS-dd-sun.csv', '1P4RNXSlls4BJb2n7hvFUJxUSi_TX9O31');
+}
+
+// ========== CSV CONVERTER (REUSE EXISTING OR ADD THIS) ==========
+function convertRangeToCsv(sheet) {
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  return values
+    .map(row =>
+      row
+        .map(cell => {
+          if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"') || cell.includes('\n'))) {
+            return `"${cell.replace(/"/g, '""')}"`;
+          }
+          return cell;
+        })
+        .join(',')
+    )
+    .join('\r\n');
+}
 
 // Apply weight mapping
 function applyWeightFormula() {
@@ -424,82 +521,69 @@ function importHomeDepotNeworders() {
 
 
 // Convert document-PS-sams.xlsx → CSV → import
+// Convert first Excel file in Sam's folder → CSV → import
 function convertSamsExcelToCSVAndImport() {
-const baseFolderName = 'PO Production';
-const orderFolderName = 'Order Files';
-const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
-const targetSheetName = 'Sheet1';
+  const folderId = '1HWtSvDcv_cdsYQqUzG3SwxKi-2DVcKqC'; // Sam's Club folder ID
+  const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  const targetSheetName = 'Sheet1';
 
-// --- Find base folder ---
-const baseFolders = DriveApp.getFoldersByName(baseFolderName);
-if (!baseFolders.hasNext()) {
-SpreadsheetApp.getUi().alert(`Folder "${baseFolderName}" not found.`);
-return;
-}
-const baseFolder = baseFolders.next();
+  // --- Find folder by ID ---
+  const orderFolder = DriveApp.getFolderById(folderId);
 
-// --- Find order folder ---
-const orderFolders = baseFolder.getFoldersByName(orderFolderName);
-if (!orderFolders.hasNext()) {
-SpreadsheetApp.getUi().alert(`Folder "${orderFolderName}" not found inside "${baseFolderName}".`);
-return;
-}
-const orderFolder = orderFolders.next();
+  // --- Find first .xlsx file ---
+  let files = orderFolder.getFiles();
+  let file = null;
+  while (files.hasNext()) {
+    let f = files.next();
+    if (f.getName().toLowerCase().endsWith('.xlsx')) {
+      file = f;
+      break;
+    }
+  }
+  if (!file) {
+    SpreadsheetApp.getUi().alert(`No .xlsx file found in the folder.`);
+    return;
+  }
 
-// --- Find first .xlsx file ---
-let files = orderFolder.getFiles();
-let file = null;
-while (files.hasNext()) {
-let f = files.next();
-if (f.getName().toLowerCase().endsWith('.xlsx')) {
-file = f;
-break;
-}
-}
-if (!file) {
-SpreadsheetApp.getUi().alert(`No .xlsx file found in "${orderFolderName}".`);
-return;
-}
+  // --- Convert Excel to Google Sheet ---
+  const convertedSheetId = uploadExcelAsGoogleSheet_(file.getBlob(), 'TempImportFile');
 
-// --- Convert Excel to Google Sheet ---
-const convertedSheetId = uploadExcelAsGoogleSheet_(file.getBlob(), 'TempImportFile');
+  // --- Delete the original Excel file ---
+  file.setTrashed(true);
 
-// --- Delete the original Excel file ---
-file.setTrashed(true);
+  const sh = SpreadsheetApp.openById(convertedSheetId);
+  const targetTab = pickDensestSheet_(sh);
+  if (!targetTab) {
+    DriveApp.getFileById(convertedSheetId).setTrashed(true);
+    SpreadsheetApp.getUi().alert('❌ No sheets found in converted workbook.');
+    return;
+  }
 
-const sh = SpreadsheetApp.openById(convertedSheetId);
-const targetTab = pickDensestSheet_(sh);
-if (!targetTab) {
-DriveApp.getFileById(convertedSheetId).setTrashed(true);
-SpreadsheetApp.getUi().alert('❌ No sheets found in converted workbook.');
-return;
-}
+  // --- Export tab as CSV ---
+  const csvBlob = exportSheetToCsvBlob_(
+    convertedSheetId,
+    targetTab.getSheetId(),
+    file.getName().replace(/\.xlsx$/i, '.csv')
+  );
+  orderFolder.createFile(csvBlob);
 
-// --- Export tab as CSV ---
-const csvBlob = exportSheetToCsvBlob_(
-convertedSheetId,
-targetTab.getSheetId(),
-file.getName().replace(/\.xlsx$/i, '.csv')
-);
-orderFolder.createFile(csvBlob);
+  // --- Import CSV robustly into Google Sheet ---
+  const targetSS = SpreadsheetApp.openById(spreadsheetId);
+  const targetSheet = targetSS.getSheetByName(targetSheetName);
 
-// --- Import CSV robustly into Google Sheet ---
-const targetSS = SpreadsheetApp.openById(spreadsheetId);
-const targetSheet = targetSS.getSheetByName(targetSheetName);
+  if (!targetSheet) {
+    SpreadsheetApp.getUi().alert(`❌ Target sheet "${targetSheetName}" not found.`);
+    return;
+  }
 
-if (!targetSheet) {
-SpreadsheetApp.getUi().alert(`❌ Target sheet "${targetSheetName}" not found.`);
-return;
-}
+  importCsvBlobToSheet(csvBlob, targetSheet);
 
-importCsvBlobToSheet(csvBlob, targetSheet);
+  // --- Delete temporary Google Sheet ---
+  DriveApp.getFileById(convertedSheetId).setTrashed(true);
 
-// --- Delete temporary Google Sheet ---
-DriveApp.getFileById(convertedSheetId).setTrashed(true);
-
-SpreadsheetApp.getUi().alert(
-`✅ "${file.getName()}" converted to CSV (tab: "${targetTab.getName()}") and imported. Original Excel deleted.`
-);
+  SpreadsheetApp.getUi().alert(
+    `✅ "${file.getName()}" converted to CSV (tab: "${targetTab.getName()}") and imported. Original Excel deleted.`
+  );
 }
 
 // --- Helper function to robustly import CSV Blob ---
@@ -684,4 +768,3 @@ tempSheet.setName(sheetName);
 
 SpreadsheetApp.getUi().alert('✅ Spreadsheet has been restored.');
 }
-
