@@ -8,7 +8,8 @@ const ui = SpreadsheetApp.getUi();
 ui.createMenu('Inbound')
 // Conversion
 .addItem('--- 🔄 Conversion ---', 'doNothing')
-.addItem('Convert and import .neworders file', 'renameNewordersToCSVInNeworderFilesAndImport')
+.addItem("Lowe's New Orders Import", 'importLowesNeworders')
+.addItem("Home Depot New Orders Import", 'importHomeDepotNeworders')
 .addItem('Convert and import Excel to .csv file', 'convertSamsExcelToCSVAndImport')
 .addItem('Convert Amazon txt file to .csv', 'importPSAmazonAnyTxt')
 
@@ -370,56 +371,55 @@ SpreadsheetApp.getUi().alert(
 );
 }
 
-// =================== SCRIPT 2 FUNCTIONS ===================
+// ----------------- New .neworders Import Helper -----------------
+function importNewordersFromFolder(folderId, spreadsheetId, sheetName) {
+  const folder = DriveApp.getFolderById(folderId);
+  const files = folder.getFiles();
+  let processedCount = 0;
 
-// Rename .neworders → .csv and import
-function renameNewordersToCSVInNeworderFilesAndImport() {
-const baseFolderName = 'PO Production';
-const neworderFolderName = 'Neworder Files';
-const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getName().toLowerCase().endsWith('.neworders')) {
 
-const baseFolders = DriveApp.getFoldersByName(baseFolderName);
-if (!baseFolders.hasNext()) { SpreadsheetApp.getUi().alert(`Folder "${baseFolderName}" not found.`); return; }
-const baseFolder = baseFolders.next();
+      // Rename to .csv
+      const newName = file.getName().replace(/\.neworders$/i, '.csv');
+      const blob = file.getBlob().setName(newName);
+      folder.createFile(blob); // create new CSV
+      file.setTrashed(true);   // trash original
 
-const neworderFolders = baseFolder.getFoldersByName(neworderFolderName);
-if (!neworderFolders.hasNext()) { SpreadsheetApp.getUi().alert(`Folder "${neworderFolderName}" not found inside "${baseFolderName}".`); return; }
-const neworderFolder = neworderFolders.next();
+      // Open target sheet
+      const ss = SpreadsheetApp.openById(spreadsheetId);
+      const sheet = ss.getSheetByName(sheetName);
+      if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
 
-const files = neworderFolder.getFiles();
-let renamedCount = 0;
+      sheet.clearContents();
 
-while (files.hasNext()) {
-const file = files.next();
-const name = file.getName();
-Logger.log("Found file: " + name);
+      // Parse CSV and set values
+      const csvData = Utilities.parseCsv(blob.getDataAsString());
+      if (csvData.length > 0) {
+        sheet.getRange(1, 1, csvData.length, csvData[0].length).setValues(csvData);
+      }
 
-if (name.toLowerCase().endsWith('.neworders')) {
-const newName = name.replace(/\.neworders$/i, '.csv');
-Logger.log("Renaming to: " + newName);
+      processedCount++;
+      break; // stop after first .neworders file
+    }
+  }
 
-const blob = file.getBlob().setName(newName);
-neworderFolder.createFile(blob);
-file.setTrashed(true);
-
-const ss = SpreadsheetApp.openById(spreadsheetId);
-const sheet = ss.getSheetByName("Sheet1");
-if (!sheet) throw new Error('❌ Could not find "Sheet1" in spreadsheet');
-
-sheet.clearContents();
-
-const csvData = Utilities.parseCsv(blob.getDataAsString("UTF-8"));
-Logger.log("Rows parsed: " + csvData.length + " x " + (csvData[0] ? csvData[0].length : 0));
-
-if (csvData.length > 0) {
-sheet.getRange(1, 1, csvData.length, csvData[0].length).setValues(csvData);
-}
-renamedCount++;
-}
+  SpreadsheetApp.getUi().alert(`✅ ${processedCount} file(s) imported from folder ${folderId}`);
 }
 
-Logger.log("Total renamed: " + renamedCount);
-SpreadsheetApp.getUi().alert(`✅ ${renamedCount} file(s) renamed and imported into "Sheet1".`);
+// Wrapper for Lowe's
+function importLowesNeworders() {
+  const folderId = '1t3rEMKX3gtkXxmtcJegvPSmJlEsweNy9';
+  const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  importNewordersFromFolder(folderId, spreadsheetId, 'Sheet1');
+}
+
+// Wrapper for Home Depot
+function importHomeDepotNeworders() {
+  const folderId = '1wYO_YGXpvaIAnW0kDmrgRDUHiOmck0hX';
+  const spreadsheetId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  importNewordersFromFolder(folderId, spreadsheetId, 'Sheet1');
 }
 
 
