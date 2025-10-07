@@ -8,11 +8,12 @@ const ui = SpreadsheetApp.getUi();
 ui.createMenu('Inbound')
 // Conversion
 .addItem('--- 🔄 Conversion ---', 'doNothing')
+.addItem('Amazon Order Import', 'importPSAmazonAnyTxt')
 .addItem('Dig Defence Import', 'digDefence')
-.addItem("Lowe's New Orders Import", 'importLowesNeworders')
-.addItem("Home Depot New Orders Import", 'importHomeDepotNeworders')
-.addItem('Convert and import Excel to .csv file', 'convertSamsExcelToCSVAndImport')
-.addItem('Convert Amazon txt file to .csv', 'importPSAmazonAnyTxt')
+.addItem("Home Depot Import", 'importHomeDepotNeworders')
+.addItem("Lowe's Import", 'importLowesNeworders')
+.addItem("Sam's Import", 'convertSamsExcelToCSVAndImport')
+
 
 // Validation
 .addItem('--- ✅ Validation ---', 'doNothing')
@@ -23,11 +24,18 @@ ui.createMenu('Inbound')
 
 // Menu 2: Outbound (Export / Combine)
 ui.createMenu('Outbound')
+// Amazon
+.addItem('--- 📦 Amazon ---', 'doNothing')
+.addItem('Export Amazon', 'exportPSAmazon')
+.addItem('Export Amazon Thurs', 'exportPSAmazonThurs')
+.addItem('Export Amazon Sun', 'exportPSAmazonSun')
+
 //Dig Defence
 .addItem('--- 🐶 Dig Defence ---', 'doNothing')
 .addItem('Export To: document-PS-dd', 'document_PS_dd')
 .addItem('Export To: document-PS-dd-thurs', 'document_PS_dd_thurs')
 .addItem('Export To: document-PS-dd-sun', 'document_PS_dd_sun')
+
 // Home Depot
 .addItem('--- 🏠 Home Depot ---', 'doNothing')
 .addItem('Export To: document-PS-homedepot', 'exportPSHomeDepot')
@@ -40,17 +48,11 @@ ui.createMenu('Outbound')
 .addItem('Export To: document-PS-lowes-thurs', 'exportPSLowesThurs')
 .addItem('Export To: document-PS-lowes-sun', 'exportPSLowesSun')
 
-// Sams
+// Sam's
 .addItem('--- 🛒 Sams ---', 'doNothing')
 .addItem('Export To: document-PS-sams', 'exportPSSams')
 .addItem('Export To: document-PS-sams-thurs', 'exportPSSamsThurs')
 .addItem('Export To: document-PS-sams-sun', 'exportPSSamsSun')
-
-// Amazon
-.addItem('--- 📦 Amazon ---', 'doNothing')
-.addItem('Export Amazon', 'exportPSAmazon')
-.addItem('Export Amazon Thurs', 'exportPSAmazonThurs')
-.addItem('Export Amazon Sun', 'exportPSAmazonSun')
 
 // Combine
 .addItem('--- 🔗 Combine CSVs ---', 'doNothing')
@@ -63,6 +65,7 @@ ui.createMenu('Sheet Tools')
 .addItem('--- 🧹 Maintenance ---', 'doNothing')
 .addItem('Reset Formatting', 'resetFormatting')
 .addItem('Delete Sheet', 'clearSheet')
+.addItem('Clean Trading Partner Order Files', 'purgeFiles')
 .addItem('Purge Exported CSV Files', 'purgeExportedCSVs')
 .addToUi();
 }
@@ -816,7 +819,33 @@ function purgeExportedCSVs() {
   SpreadsheetApp.getUi().alert(`🧹 ${count} CSV file(s) moved to trash from export folder.`);
 }
 
+function purgeFiles() {
+  const folderIds = [
+    '1D67NuVHGp9ESn9BIwsUiGPr10-531J8O',
+    '1xJJA6uJlSEJC2s9spfn0ShWwWCx3v4Qi',
+    '1wYO_YGXpvaIAnW0kDmrgRDUHiOmck0hX',
+    '1t3rEMKX3gtkXxmtcJegvPSmJlEsweNy9',
+    '1HWtSvDcv_cdsYQqUzG3SwxKi-2DVcKqC'
+  ];
 
+  let totalDeleted = 0;
+
+  folderIds.forEach(folderId => {
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFiles();
+
+    while (files.hasNext()) {
+      const file = files.next();
+      const name = file.getName().toLowerCase();
+      if (name.endsWith('.csv') || name.endsWith('.txt') || name.endsWith('.xlsx')) {
+        file.setTrashed(true);
+        totalDeleted++;
+      }
+    }
+  });
+
+  SpreadsheetApp.getUi().alert(`✅ Purge complete. Total files deleted: ${totalDeleted}`);
+}
 
 
 
