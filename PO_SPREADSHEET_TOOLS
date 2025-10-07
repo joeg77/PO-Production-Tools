@@ -24,7 +24,7 @@ ui.createMenu('Inbound')
 // Menu 2: Outbound (Export / Combine)
 ui.createMenu('Outbound')
 //Dig Defence
-.addItem('---  Dig Defence ---', 'doNothing')
+.addItem('--- 🐶 Dig Defence ---', 'doNothing')
 .addItem('Export To: document-PS-dd', 'document_PS_dd')
 .addItem('Export To: document-PS-dd-thurs', 'document_PS_dd_thurs')
 .addItem('Export To: document-PS-dd-sun', 'document_PS_dd_sun')
@@ -60,8 +60,10 @@ ui.createMenu('Outbound')
 
 // Menu 3: Sheet Tools
 ui.createMenu('Sheet Tools')
+.addItem('--- 🧹 Maintenance ---', 'doNothing')
 .addItem('Reset Formatting', 'resetFormatting')
 .addItem('Delete Sheet', 'clearSheet')
+.addItem('Purge Exported CSV Files', 'purgeExportedCSVs')
 .addToUi();
 }
 
@@ -406,66 +408,93 @@ SpreadsheetApp.getUi().alert(
 );
 }
 
-// Import first .txt Amazon file found in Order Files folder
 function importPSAmazonAnyTxt() {
-const folderId = '1P4RNXSlls4BJb2n7hvFUJxUSi_TX9O31';  // Amazon order files folder
-const folder = DriveApp.getFolderById(folderId);
+  const folderId = '1D67NuVHGp9ESn9BIwsUiGPr10-531J8O';
+  const ssId = '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY';
+  const targetSheetName = 'Sheet1';  // or whatever tab you want to write to
 
-const files = folder.getFiles();
-let txtFile = null;
+  // Access folder
+  let folder;
+  try {
+    folder = DriveApp.getFolderById(folderId);
+  } catch (err) {
+    SpreadsheetApp.getUi().alert('❌ Invalid Amazon folder ID or inaccessible folder.');
+    console.error('importPSAmazonAnyTxt: cannot access folder: ' + err);
+    return;
+  }
 
-while (files.hasNext()) {
-const f = files.next();
-if (f.getName().toLowerCase().endsWith('.txt')) {
-txtFile = f;
-break;
-}
-}
+  const files = folder.getFiles();
+  let txtFile = null;
 
-if (!txtFile) {
-SpreadsheetApp.getUi().alert('❌ No .txt file found in Amazon folder.');
-return;
-}
+  while (files.hasNext()) {
+    const f = files.next();
+    if (f.getName().toLowerCase().endsWith('.txt')) {
+      txtFile = f;
+      break;
+    }
+  }
 
-const txtContent = txtFile.getBlob().getDataAsString();
-const rows = txtContent.trim().split(/\r?\n/).map(line => line.split('\t'));
-if (rows.length < 2) {
-SpreadsheetApp.getUi().alert('❌ File appears empty or invalid.');
-return;
-}
+  if (!txtFile) {
+    SpreadsheetApp.getUi().alert('❌ No .txt file found in Amazon folder.');
+    return;
+  }
 
-const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-sheet.clearContents();
+  const blob = txtFile.getBlob();
+  const txtContent = blob.getDataAsString();
+  const lines = txtContent.trim().split(/\r?\n/);
+  if (lines.length < 2) {
+    SpreadsheetApp.getUi().alert('❌ File appears empty or invalid.');
+    return;
+  }
 
-const targetHeaders = [
-"PKG_PACKAGE_ID","SHPTO_NAME","SHPTO_ADDRESS_1","SHPTO_ADDRESS_2","SHPTO_ADDRESS_3",
-"SHPTO_CITY","SHPTO_STATE_PROV","SHPTO_POSTAL_CODE","SHPTO_COUNTRY_ID","SHPTO_TELEPHONE",
-"PKG_SERVICE_TYPE","PKG_WEIGHT_ACTUAL","PKG_CUSTOM1","PKG_CUSTOM2","PKG_CUSTOM3",
-"PKG_CUSTOM4","PKG_CUSTOM5","SHPTO_RESIDENTIAL","UOL_SOURCE","SHPTO_ATTN_LINE",
-"SHPTO_COMPANY","MERCHANT_ID"
-];
-sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+  // Convert lines to array of arrays
+  const rows = lines.map(line => line.split('\t'));
 
-const dataRows = rows.slice(1);
-const colMapping = [
-[0, 0],  [1, 13], [8, 1],  [10, 9], [11, 12], [13, 16],
-[18, 2], [19, 3], [20, 4], [21, 5], [22, 6],  [23, 7], [24, 8]
-];
+  // Open spreadsheet and sheet
+  const ss = SpreadsheetApp.openById(ssId);
+  const sheet = ss.getSheetByName(targetSheetName);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert(`❌ Sheet "${targetSheetName}" not found.`);
+    return;
+  }
 
-const output = dataRows.map(row => {
-let newRow = new Array(targetHeaders.length).fill('');
-colMapping.forEach(([src, dest]) => newRow[dest] = row[src] || '');
-newRow[21] = "Amazon"; // MERCHANT_ID
-return newRow;
-});
+  // Clear existing content
+  sheet.clearContents();
 
-if (output.length > 0) {
-sheet.getRange(2, 1, output.length, targetHeaders.length).setValues(output);
-}
+  // Write headers
+  const targetHeaders = [
+    "PKG_PACKAGE_ID","SHPTO_NAME","SHPTO_ADDRESS_1","SHPTO_ADDRESS_2","SHPTO_ADDRESS_3",
+    "SHPTO_CITY","SHPTO_STATE_PROV","SHPTO_POSTAL_CODE","SHPTO_COUNTRY_ID","SHPTO_TELEPHONE",
+    "PKG_SERVICE_TYPE","PKG_WEIGHT_ACTUAL","PKG_CUSTOM1","PKG_CUSTOM2","PKG_CUSTOM3",
+    "PKG_CUSTOM4","PKG_CUSTOM5","SHPTO_RESIDENTIAL","UOL_SOURCE","SHPTO_ATTN_LINE",
+    "SHPTO_COMPANY","MERCHANT_ID"
+  ];
+  sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
 
-SpreadsheetApp.getUi().alert(
-`✅ Amazon import complete from "${txtFile.getName()}". Rows imported: ${output.length}.`
-);
+  const dataRows = rows.slice(1);
+
+  // You may need to adjust this mapping depending on your file’s columns
+  const colMapping = [
+    [0, 0],  [1, 13], [8, 1],  [10, 9], [11, 12], [13, 16],
+    [18, 2], [19, 3], [20, 4], [21, 5], [22, 6],  [23, 7], [24, 8]
+  ];
+
+  const output = dataRows.map(row => {
+    let newRow = new Array(targetHeaders.length).fill('');
+    colMapping.forEach(([src, dest]) => {
+      newRow[dest] = row[src] || '';
+    });
+    newRow[21] = "Amazon";  // MERCHANT_ID
+    return newRow;
+  });
+
+  if (output.length > 0) {
+    sheet.getRange(2, 1, output.length, targetHeaders.length).setValues(output);
+  }
+
+  SpreadsheetApp.getUi().alert(
+    `✅ Amazon import complete from "${txtFile.getName()}". Rows imported: ${output.length}.`
+  );
 }
 
 // ----------------- New .neworders Import Helper -----------------
@@ -768,3 +797,26 @@ tempSheet.setName(sheetName);
 
 SpreadsheetApp.getUi().alert('✅ Spreadsheet has been restored.');
 }
+
+// === PURGE EXPORTED CSV FILES ===
+function purgeExportedCSVs() {
+  const folderId = '1P4RNXSlls4BJb2n7hvFUJxUSi_TX9O31'; // Exports folder
+  const folder = DriveApp.getFolderById(folderId);
+  const files = folder.getFiles();
+  let count = 0;
+
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getName().toLowerCase().endsWith('.csv')) {
+      file.setTrashed(true); // Moves to Drive trash (safer than permanent delete)
+      count++;
+    }
+  }
+
+  SpreadsheetApp.getUi().alert(`🧹 ${count} CSV file(s) moved to trash from export folder.`);
+}
+
+
+
+
+
