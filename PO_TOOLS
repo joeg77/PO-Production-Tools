@@ -12,7 +12,7 @@ const AMAZON_TXT_FOLDER_ID = '1JKbS5nnUcnFgyc8WJzcPQd1aBJLp1uxz'; // Amazon fold
 const TRADING_PARTNER_DESTINATION_ID = '1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY'; // Destination for copied trading partner PDFs
 const SHIPPING_LABEL_DESTINATION_ID = '1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN'; // Destination for copied shipping label PDFs
 const SHIPPING_MANIFEST_DESTINATION_ID = '11jxPplN9wGBIrtkyxUXo5tpaRaTzWX0a'; // Destination for copied shipping manifest PDFs
-const DDPOS_FOLDER_ID = 'DDPOS_FOLDER_ID'; // Replace with DDPOS folder ID
+const DDPOS_FOLDER_ID = '1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp'; // Replace with DDPOS folder ID
 const DDPOS_FILENAME = 'document-PS-ddpos'; // Filename for DDPOS PDFs
 const DIG_DEFENCE_FOLDER_ID = '1YScXpnNqJSjWM4tdxna95YqI0D9hzknJ';
 
@@ -159,22 +159,55 @@ function renameShippingManifestPDFs() {
 // ======= DDPOS Files Renaming =======
 function renameDDPOSFiles() {
   try {
-    Logger.log(`Renaming DDPOS files in folder ${DDPOS_FOLDER_ID}`);
     const folder = DriveApp.getFolderById(DDPOS_FOLDER_ID);
     const files = folder.getFilesByType(MimeType.PDF);
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
     let index = 1;
     let totalFiles = 0;
+
     while (files.hasNext()) {
       const file = files.next();
-      file.setName(`${DDPOS_FILENAME}${index > 1 ? `-${index}` : ''}.pdf`);
+      const newName = `${today}-ddpos${index > 1 ? `-${index}` : ''}.pdf`;
+      file.setName(newName);
       index++;
       totalFiles++;
     }
+
     Logger.log(`Renamed ${totalFiles} DDPOS files`);
-    return `✅ Renamed ${totalFiles} DDPOS PDFs`;
+    return `✅ Renamed ${totalFiles} DDPOS PDFs to ${today}-ddpos*.pdf`;
   } catch (e) {
     Logger.log(`Error renaming DDPOS files: ${e.message}`);
     return `⚠️ Failed to rename DDPOS PDFs: ${e.message}`;
+  }
+}
+// ======= Moving Shipping Docs =======
+
+function prepareShippingDocuments() {
+  try {
+    const SOURCE_FOLDERS = [
+      "1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp", // Source folder 1
+      "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"  // Source folder 2
+    ];
+    const DESTINATION_FOLDER_ID = "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK";
+    const destination = DriveApp.getFolderById(DESTINATION_FOLDER_ID);
+    let totalCopied = 0;
+
+    SOURCE_FOLDERS.forEach(folderId => {
+      const folder = DriveApp.getFolderById(folderId);
+      const files = folder.getFilesByType(MimeType.PDF);
+
+      while (files.hasNext()) {
+        const file = files.next();
+        file.makeCopy(file.getName(), destination);
+        totalCopied++;
+      }
+    });
+
+    Logger.log(`Copied ${totalCopied} PDF(s) to destination folder`);
+    return `✅ ${totalCopied} PDF(s) copied to Shipping Documents folder`;
+  } catch (e) {
+    Logger.log(`Error in prepareShippingDocuments: ${e.message}`);
+    return `⚠️ Failed to prepare shipping documents: ${e.message}`;
   }
 }
 
@@ -936,7 +969,7 @@ function purgeAllPDFs() {
     ...tradingPartners.map(p => p.id),
     ...shippingLabelPartners.map(p => p.id),
     ...shippingManifestPartners.map(p => p.id),
-    // DDPOS_FOLDER_ID, // Uncomment when you have a valid ID
+    DDPOS_FOLDER_ID,
     TRADING_PARTNER_DESTINATION_ID,
     SHIPPING_LABEL_DESTINATION_ID,
     SHIPPING_MANIFEST_DESTINATION_ID
@@ -954,6 +987,31 @@ function purgeAllPDFs() {
   });
   return results.join('\n') || '✅ Purge completed (no valid folders processed)';
 }
+
+
+// ======= Purge Daily PDFs =======
+
+function purgeDailyShippingDocs() {
+  try {
+    const FOLDER_ID = "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK";
+    const folder = DriveApp.getFolderById(FOLDER_ID);
+    const files = folder.getFilesByType(MimeType.PDF);
+    let totalDeleted = 0;
+
+    while (files.hasNext()) {
+      const file = files.next();
+      file.setTrashed(true);
+      totalDeleted++;
+    }
+
+    Logger.log(`Purged ${totalDeleted} PDFs from Daily Shipping Docs folder`);
+    return `✅ Purged ${totalDeleted} PDF(s) from Daily Shipping Docs folder`;
+  } catch (e) {
+    Logger.log(`Error in purgeDailyShippingDocs: ${e.message}`);
+    return `⚠️ Failed to purge Daily Shipping Docs: ${e.message}`;
+  }
+}
+
 // ======= Format Spreadsheet =======
 function resetFormatting() {
   const ss = SpreadsheetApp.openById('18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY'); // your file ID
@@ -980,4 +1038,3 @@ function doGet() {
     .setHeight(400)
     .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
-
