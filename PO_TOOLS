@@ -975,17 +975,28 @@ function purgeAllPDFs() {
     SHIPPING_MANIFEST_DESTINATION_ID
   ]);
 
+  let totalDeleted = 0;
 
-  let results = [];
   allFolderIds.forEach(id => {
     if (id && !id.match(/^(YOUR_|DDPOS_)/)) {
-      results.push(purgeFolder(id));
+      try {
+        const folder = DriveApp.getFolderById(id);
+        const files = folder.getFiles();
+        let count = 0;
+        while (files.hasNext()) {
+          files.next().setTrashed(true);
+          count++;
+        }
+        totalDeleted += count;
+      } catch (e) {
+        Logger.log(`Skipped folder ${id}: ${e.message}`);
+      }
     } else {
       Logger.log(`Skipped invalid or placeholder folder ID: ${id}`);
-      results.push(`⚠️ Skipped invalid or placeholder folder ID: ${id}`);
     }
   });
-  return results.join('\n') || '✅ Purge completed (no valid folders processed)';
+
+  return `✅ Purged ${totalDeleted} file(s) from all PDF folders`;
 }
 
 
