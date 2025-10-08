@@ -1,75 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PDF and Spreadsheet Tools</title>
+
   <style>
+    /* Reset defaults */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      background-color: #f0f0f0;
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      margin: 0;
-      padding: 10px;
     }
+
     .container {
-      background-color: #fff;
-      padding: 20px 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       width: 100%;
-      max-width: 900px;
+      max-width: 800px;
+      background: #000;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      border-radius: 0;
+      padding: 0;
     }
+
     h1 {
       text-align: center;
-      color: #333;
-      margin-bottom: 20px;
-      font-size: 4em;
+      margin: 20px 0;
+      font-size: 2rem;
+      color: #fff;
     }
+
     .accordion-header {
-      margin: 0;
-      font-size: 3em;
-      color: #555;
+      font-size: 1.5rem;
+      background: #222;
+      color: #fff;
+      padding: 15px;
       cursor: pointer;
-      padding: 10px 0;
-      border-bottom: 1px solid #eee;
-      transition: color 0.2s;
+      border-top: 1px solid #333;
+      transition: background 0.2s ease;
     }
+
     .accordion-header:hover {
-      color: #000;
+      background: #333;
     }
+
     .accordion-content {
       display: none;
-      margin-bottom: 15px;
+      width: 100%;
     }
+
     .accordion-content.active {
       display: block;
     }
+
     .button-group {
       display: flex;
       flex-direction: column;
       gap: 10px;
-    }
-    button {
-      padding: 14px;
-      font-size: 50px;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
       width: 100%;
-      text-align: left;
-      transition: all 0.2s;
+      margin: 0;
+      padding: 0;
     }
-    button:hover { opacity: 0.9; }
-    button.amazon { background-color: #007BFF; }
-    button.sam { background-color: #28a745; }
-    button.pdf { background-color: #6f42c1; }
-    button.purge { background-color: #dc3545; }
-    button.validation { background-color: #ff9800; }
+
+    .remote-btn {
+      width: 100%;
+      padding: 20px;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 0;
+      background: #222;
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .remote-btn:hover {
+      background: #333;
+    }
+
+    .remote-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Optional color accents by category */
+    .amazon { background: #1d3557; }
+    .sam { background: #457b9d; }
+    .pdf { background: #6f42c1; }
+    .purge { background: #e63946; }
+    .validation { background: #ff9800; }
+
+    .amazon:hover { background: #2a4d8f; }
+    .sam:hover { background: #5b8fb8; }
+    .pdf:hover { background: #7f56d9; }
+    .purge:hover { background: #c53030; }
+    .validation:hover { background: #e68900; }
 
     #toast {
       position: fixed;
@@ -85,101 +118,45 @@
     }
 
     /* Mobile */
-    @media (max-width: 480px) {
-      .container { padding: 15px 10px; }
-      h1 { font-size: 50px; }
-      .accordion-header { font-size: 18px; }
-      .button-group { gap: 15px; }
-      button { font-size: 16px; padding: 12px; }
-      #toast { font-size: 14px; padding: 10px 15px; bottom: 10px; right: 10px; }
-    }
-
-    /* Tablets */
-    @media (min-width: 481px) and (max-width: 1024px) {
-      h1 { font-size: 3em; }
-      .accordion-header { font-size: 2em; }
-      button { font-size: 24px; padding: 14px; }
-    }
-
-    /* Desktop */
-    @media (min-width: 1025px) {
-      h1 { font-size: 4em; }
-      .accordion-header { font-size: 3em; }
-      button { font-size: 50px; }
+    @media (max-width: 600px) {
+      body {
+        align-items: stretch;
+      }
+      .container {
+        max-width: none;
+        height: 100vh;
+        overflow-y: auto;
+        border-radius: 0;
+      }
+      h1 {
+        font-size: 1.6rem;
+      }
+      .accordion-header {
+        font-size: 1.2rem;
+      }
+      .remote-btn {
+        font-size: 1rem;
+        padding: 16px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>PDF and Spreadsheet Tools</h1>
-
-    <!-- Amazon -->
-    <h2 class="accordion-header">Amazon</h2>
-    <div class="accordion-content">
-      <div class="button-group">
-        <button class="amazon" onclick="runFunction('importPSAmazon')">Import Amazon TXT</button>
-        <button class="amazon" onclick="runFunction('exportPSAmazon')">Export Amazon Daily CSV</button>
-        <button class="amazon" onclick="runFunction('exportPSAmazonThurs')">Export Amazon Thursday CSV</button>
-        <button class="amazon" onclick="runFunction('exportPSAmazonSun')">Export Amazon Sunday CSV</button>
-      </div>
-    </div>
-
-    <!-- Dig Defence -->
-    <h2 class="accordion-header">Dig Defence</h2>
-    <div class="accordion-content">
-      <div class="button-group">
-        <button class="pdf" onclick="runFunction('renameDigDefenceCSVDefault')">Rename DD CSV</button>
-        <button class="pdf" onclick="runFunction('renameDigDefenceCSVThurs')">Rename DD Thursday CSV</button>
-        <button class="pdf" onclick="runFunction('renameDigDefenceCSVSun')">Rename DD Sunday CSV</button>
-      </div>
-    </div>
-
-    <!-- Neworder Files -->
-    <h2 class="accordion-header">Neworder Files</h2>
-    <div class="accordion-content">
-      <div class="button-group">
-        <button class="pdf" onclick="runFunction('importNewordersHomeDepot')">
-          Import Home Depot (.neworders or CSV)
-        </button>
-        <button class="pdf" onclick="runFunction('importNewordersLowes')">
-          Import Lowes (.neworders or CSV)
-        </button>
-      </div>
-    </div>
-
-<!-- Validation -->
-<h2 class="accordion-header">Validation</h2>
-<div class="accordion-content">
-  <div class="button-group">
-    <button class="pdf" onclick="runFunction('applyWeightFormula')">Apply Weights</button>
-    <button class="pdf" onclick="runFunction('fixZipCodesValidation')">Fix Zip Codes</button>
-    <button class="pdf" onclick="runFunction('checkLowesHomeDepotLimitsValidation')">Check Lowes & Home Depot Limits</button>
-  </div>
-</div>
-
-
-    <!-- Sam's -->
-    <h2 class="accordion-header">Sam's</h2>
-    <div class="accordion-content">
-      <div class="button-group">
-        <button class="sam" onclick="runFunction('convertLatestSamsExcelToCSVAndImport')">Import Sam's Excel File</button>
-        <button class="sam" onclick="runFunction('exportPSSams')">Export Sam's Daily CSV</button>
-        <button class="sam" onclick="runFunction('exportPSSamsThurs')">Export Sam's Thursday CSV</button>
-        <button class="sam" onclick="runFunction('exportPSSamsSun')">Export Sam's Sunday CSV</button>
-      </div>
-    </div>
+    <h1>PO PDF Tools</h1>
 
     <!-- PDF Operations -->
     <h2 class="accordion-header">PDF Operations</h2>
     <div class="accordion-content">
       <div class="button-group">
-        <button class="pdf" onclick="runFunction('renameTradingPartnerFiles')">Rename Trading Partner Packing Slips</button>
-        <button class="pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
-        <button class="pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
-        <button class="pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
-        <button class="pdf" onclick="runFunction('copyTradingPartnerPDFs')">Copy Trading Partner Packing Slips</button>
-        <button class="pdf" onclick="runFunction('copyShippingLabelPDFs')">Copy Shipping Labels</button>
-        <button class="pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
+        <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFiles')">Rename Trading Partner Packing Slips</button>
+        <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
+        <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
+        <button class="remote-btn pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
+        <button class="remote-btn pdf" onclick="runFunction('copyTradingPartnerPDFs')">Copy Trading Partner Packing Slips</button>
+        <button class="remote-btn pdf" onclick="runFunction('copyShippingLabelPDFs')">Copy Shipping Labels</button>
+        <button class="remote-btn pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
+        <button class="remote-btn pdf" onclick="runFunction('prepareShippingDocuments')">Prepare Shipping Documents</button>
       </div>
     </div>
 
@@ -187,12 +164,8 @@
     <h2 class="accordion-header">Purge Operations</h2>
     <div class="accordion-content">
       <div class="button-group">
-        <button class="purge" onclick="runFunction('purgeFolderAmazon')">Purge Amazon Spreadsheet Folder</button>
-        <button class="purge" onclick="runFunction('purgeFolderSams')">Purge Sam's Spreadsheet Folder</button>
-        <button class="purge" onclick="runFunction('purgeAllPDFs')">Purge All PDFs</button>
-        <button class="purge" onclick="runFunction('resetFormatting')">Reset Sheet Formatting</button>     
-
-
+        <button class="remote-btn purge" onclick="runFunction('purgeDailyShippingDocs')">Purge Daily Shipping Docs</button>
+        <button class="remote-btn purge" onclick="runFunction('purgeAllPDFs')">Purge All PDFs</button>
       </div>
     </div>
 
