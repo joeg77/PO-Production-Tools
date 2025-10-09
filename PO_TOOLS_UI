@@ -56,10 +56,21 @@
     .accordion-content {
       display: none;
       width: 100%;
+      padding-left: 0; /* nested accordions will indent */
     }
 
     .accordion-content.active {
       display: block;
+    }
+
+    .nested-accordion .accordion-header {
+      font-size: 1.2rem;
+      padding-left: 25px;
+      background: #333;
+    }
+
+    .nested-accordion .accordion-header:hover {
+      background: #444;
     }
 
     .button-group {
@@ -68,13 +79,13 @@
       gap: 10px;
       width: 100%;
       margin: 0;
-      padding: 0;
+      padding: 10px 20px;
     }
 
     .remote-btn {
       width: 100%;
-      padding: 20px;
-      font-size: 1.2rem;
+      padding: 16px;
+      font-size: 1.1rem;
       border: none;
       border-radius: 0;
       background: #222;
@@ -97,12 +108,14 @@
     .pdf { background: #6f42c1; }
     .purge { background: #e63946; }
     .validation { background: #ff9800; }
+    .emailprep { background: #009688; }
 
     .amazon:hover { background: #2a4d8f; }
     .sam:hover { background: #5b8fb8; }
     .pdf:hover { background: #7f56d9; }
     .purge:hover { background: #c53030; }
     .validation:hover { background: #e68900; }
+    .emailprep:hover { background: #00796b; }
 
     #toast {
       position: fixed;
@@ -136,7 +149,7 @@
       }
       .remote-btn {
         font-size: 1rem;
-        padding: 16px;
+        padding: 14px;
       }
     }
   </style>
@@ -147,16 +160,35 @@
 
     <!-- PDF Operations -->
     <h2 class="accordion-header">PDF Operations</h2>
-    <div class="accordion-content">
-      <div class="button-group">
-        <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFiles')">Rename Trading Partner Packing Slips</button>
-        <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
-        <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
-        <button class="remote-btn pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
-        <button class="remote-btn pdf" onclick="runFunction('copyTradingPartnerPDFs')">Copy Trading Partner Packing Slips</button>
-        <button class="remote-btn pdf" onclick="runFunction('copyShippingLabelPDFs')">Copy Shipping Labels</button>
-        <button class="remote-btn pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
-        <button class="remote-btn pdf" onclick="runFunction('prepareShippingDocuments')">Prepare Shipping Documents</button>
+    <div class="accordion-content nested-accordion">
+      <!-- Nested: Rename PDFs -->
+      <h3 class="accordion-header">Rename PDFs</h3>
+      <div class="accordion-content">
+        <div class="button-group">
+          <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFiles')">Rename Trading Partner Packing Slips</button>
+          <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
+          <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
+          <button class="remote-btn pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
+        </div>
+      </div>
+
+      <!-- Nested: Copy PDFs -->
+      <h3 class="accordion-header">Copy PDFs</h3>
+      <div class="accordion-content">
+        <div class="button-group">
+          <button class="remote-btn pdf" onclick="runFunction('copyTradingPartnerPDFs')">Copy Trading Partner Packing Slips</button>
+          <button class="remote-btn pdf" onclick="runFunction('copyShippingLabelPDFs')">Copy Shipping Labels</button>
+          <button class="remote-btn pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
+        </div>
+      </div>
+
+      <!-- Nested: Prep PDFs & Email -->
+      <h3 class="accordion-header">Prepare PDFs & Email Prep</h3>
+      <div class="accordion-content">
+        <div class="button-group">
+          <button class="remote-btn pdf" onclick="runFunction('prepareShippingDocuments')">Prepare Shipping Documents</button>
+          <button class="remote-btn emailprep" onclick="runFunction('emailPrep')">Run Email Prep</button>
+        </div>
       </div>
     </div>
 
@@ -188,14 +220,28 @@
         [funcName]();
     }
 
-    // Accordion logic
+    // Accordion toggle logic (works for nested accordions too)
     const headers = document.querySelectorAll('.accordion-header');
     headers.forEach(header => {
-      header.addEventListener('click', () => {
-        document.querySelectorAll('.accordion-content').forEach(c => c.classList.remove('active'));
+      header.addEventListener('click', (event) => {
         const content = header.nextElementSibling;
-        content.classList.add('active');
+        const isActive = content.classList.contains('active');
+
+        // Close all sibling content at the same nesting level
+        const parent = header.parentElement;
+        const siblings = Array.from(parent.children).filter(c => c !== header && c.classList.contains('accordion-content'));
+        siblings.forEach(s => s.classList.remove('active'));
+
+        // Toggle clicked section
+        if (!isActive) content.classList.add('active');
+
+        event.stopPropagation();
       });
+    });
+
+    // Click outside closes top-level accordions
+    document.body.addEventListener('click', () => {
+      document.querySelectorAll('.container > .accordion-content').forEach(c => c.classList.remove('active'));
     });
   </script>
 </body>
