@@ -3,119 +3,107 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PDF and Spreadsheet Tools</title>
+  <title>PO PDF Tools</title>
 
   <style>
-    /* Reset defaults */
+    /* Reset some defaults for better mobile experience */
     * {
-      box-sizing: border-box;
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
     }
 
     body {
-      background: #111;
-      color: #fff;
-      font-family: sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 800px;
-      background: #000;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      border-radius: 0;
-      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #121212; /* Dark background */
+      color: #e0e0e0; /* Light text for contrast */
+      padding: 10px;
     }
 
     h1 {
       text-align: center;
+      font-size: 5rem;
       margin: 20px 0;
-      font-size: 2rem;
-      color: #fff;
+      color: #ffffff;
     }
 
-    .accordion-header {
-      font-size: 1.5rem;
-      background: #222;
-      color: #fff;
-      padding: 15px;
+    /* Accordion container */
+    .accordion {
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Style the accordion items */
+    details {
+      background-color: #1e1e1e;
+      border: 1px solid #333;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* Style the summary (button) */
+    summary {
+      padding: 20px;
+      font-size: 4.5rem;
+      font-weight: bold;
       cursor: pointer;
-      border-top: 1px solid #333;
-      transition: background 0.2s ease;
-    }
-
-    .accordion-header:hover {
-      background: #333;
-    }
-
-    .accordion-content {
-      display: none;
-      width: 100%;
-      padding-left: 0; /* nested accordions will indent */
-    }
-
-    .accordion-content.active {
-      display: block;
-    }
-
-    .nested-accordion .accordion-header {
-      font-size: 1.2rem;
-      padding-left: 25px;
-      background: #333;
-    }
-
-    .nested-accordion .accordion-header:hover {
-      background: #444;
-    }
-
-    .button-group {
+      background-color: #0d47a1;
+      color: #ffffff;
       display: flex;
-      flex-direction: column;
-      gap: 10px;
-      width: 100%;
-      margin: 0;
-      padding: 10px 20px;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
     }
 
+    /* Add a chevron icon */
+    summary::after {
+      content: '\25BC';
+      font-size: 1em;
+      transition: transform 0.3s ease;
+    }
+
+    details[open] summary::after {
+      transform: rotate(180deg);
+    }
+
+    /* Panel content */
+    .panel {
+      padding: 20px;
+      background-color: #212121;
+      border-top: 1px solid #333;
+    }
+
+    /* Buttons */
     .remote-btn {
       width: 100%;
-      padding: 16px;
-      font-size: 1.1rem;
+      padding: 25px;
+      font-size: 3.5rem;
       border: none;
-      border-radius: 0;
-      background: #222;
-      color: white;
+      border-radius: 6px;
+      background: #333;
+      color: #fff;
       cursor: pointer;
-      transition: all 0.2s ease;
+      margin-bottom: 10px;
+      transition: background 0.2s ease, transform 0.1s ease;
     }
 
     .remote-btn:hover {
-      background: #333;
+      background: #444;
     }
 
     .remote-btn:active {
       transform: scale(0.98);
     }
 
-    /* Optional color accents by category */
-    .amazon { background: #1d3557; }
-    .sam { background: #457b9d; }
+    /* Color accents */
     .pdf { background: #6f42c1; }
-    .purge { background: #e63946; }
-    .validation { background: #ff9800; }
     .emailprep { background: #009688; }
+    .purge { background: #e63946; }
 
-    .amazon:hover { background: #2a4d8f; }
-    .sam:hover { background: #5b8fb8; }
     .pdf:hover { background: #7f56d9; }
-    .purge:hover { background: #c53030; }
-    .validation:hover { background: #e68900; }
     .emailprep:hover { background: #00796b; }
+    .purge:hover { background: #c53030; }
 
     #toast {
       position: fixed;
@@ -127,82 +115,81 @@
       border-radius: 5px;
       display: none;
       z-index: 1000;
-      font-size: 16px;
+      font-size: 1.2rem;
     }
 
-    /* Mobile */
-    @media (max-width: 600px) {
-      body {
-        align-items: stretch;
-      }
-      .container {
-        max-width: none;
-        height: 100vh;
-        overflow-y: auto;
-        border-radius: 0;
-      }
-      h1 {
-        font-size: 1.6rem;
-      }
-      .accordion-header {
-        font-size: 1.2rem;
-      }
-      .remote-btn {
-        font-size: 1rem;
-        padding: 14px;
+    /* Touch-friendly */
+    @media (hover: none) {
+      summary {
+        padding: 25px;
       }
     }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <h1>PO PDF Tools</h1>
+  <h1>PO PDF Tools</h1>
+  <div class="accordion">
 
-    <!-- PDF Operations -->
-    <h2 class="accordion-header">PDF Operations</h2>
-    <div class="accordion-content nested-accordion">
-      <!-- Nested: Rename PDFs -->
-      <h3 class="accordion-header">Rename PDFs</h3>
-      <div class="accordion-content">
-        <div class="button-group">
-          <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFiles')">Rename Trading Partner Packing Slips</button>
-          <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
-          <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
-          <button class="remote-btn pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
-        </div>
+    <details>
+      <summary>PDF Operations</summary>
+      <div class="panel">
+
+        <details>
+          <summary>Renaming</summary>
+          <div class="panel">
+            <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFiles')">Rename Trading Partner Packing Slips</button>
+            <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
+            <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
+            <button class="remote-btn pdf" onclick="runFunction('renameFileToPDF')">Rename Files With No Extension to PDF</button>
+            <button class="remote-btn pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
+          </div>
+        </details>
+        
+        <details>
+          <summary>Friday Operations</summary>
+            <div class="panel">
+              <details>
+                <summary>Renaming (uses -thurs functions)</summary>
+                  <div class="panel">
+                    <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFilesThurs')">Rename Trading Partner Packing Slips (-thurs)</button>
+                    <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsThurs')">Rename Shipping Labels (-thurs)</button>
+                  </div>
+              </details>
+            </div>
+        </details>
+
+        <details>
+          <summary>Copying</summary>
+          <div class="panel">
+            <button class="remote-btn pdf" onclick="runFunction('copyTradingPartnerPDFs')">Copy Trading Partner Packing Slips</button>
+            <button class="remote-btn pdf" onclick="runFunction('copyShippingLabelPDFs')">Copy Shipping Labels</button>
+            <button class="remote-btn pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Prepping</summary>
+          <div class="panel">
+            <button class="remote-btn pdf" onclick="runFunction('prepareShippingDocuments')">Prepare Shipping Documents</button>
+            <button class="remote-btn emailprep" onclick="runFunction('emailPrep')">Run Email Prep</button>
+          </div>
+        </details>
+
       </div>
+    </details>
 
-      <!-- Nested: Copy PDFs -->
-      <h3 class="accordion-header">Copy PDFs</h3>
-      <div class="accordion-content">
-        <div class="button-group">
-          <button class="remote-btn pdf" onclick="runFunction('copyTradingPartnerPDFs')">Copy Trading Partner Packing Slips</button>
-          <button class="remote-btn pdf" onclick="runFunction('copyShippingLabelPDFs')">Copy Shipping Labels</button>
-          <button class="remote-btn pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
-        </div>
-      </div>
-
-      <!-- Nested: Prep PDFs & Email -->
-      <h3 class="accordion-header">Prepare PDFs & Email Prep</h3>
-      <div class="accordion-content">
-        <div class="button-group">
-          <button class="remote-btn pdf" onclick="runFunction('prepareShippingDocuments')">Prepare Shipping Documents</button>
-          <button class="remote-btn emailprep" onclick="runFunction('emailPrep')">Run Email Prep</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Purge Operations -->
-    <h2 class="accordion-header">Purge Operations</h2>
-    <div class="accordion-content">
-      <div class="button-group">
+    <details>
+      <summary>Purge Operations</summary>
+      <div class="panel">
         <button class="remote-btn purge" onclick="runFunction('purgeDailyShippingDocs')">Purge Daily Shipping Docs</button>
         <button class="remote-btn purge" onclick="runFunction('purgeAllPDFs')">Purge All PDFs</button>
       </div>
-    </div>
+    </details>
 
-    <div id="toast"></div>
   </div>
+
+  <div id="toast"></div>
 
   <script>
     function showToast(message) {
@@ -219,30 +206,6 @@
         .withFailureHandler(error => showToast(`Error in ${funcName}: ${error.message}`))
         [funcName]();
     }
-
-    // Accordion toggle logic (works for nested accordions too)
-    const headers = document.querySelectorAll('.accordion-header');
-    headers.forEach(header => {
-      header.addEventListener('click', (event) => {
-        const content = header.nextElementSibling;
-        const isActive = content.classList.contains('active');
-
-        // Close all sibling content at the same nesting level
-        const parent = header.parentElement;
-        const siblings = Array.from(parent.children).filter(c => c !== header && c.classList.contains('accordion-content'));
-        siblings.forEach(s => s.classList.remove('active'));
-
-        // Toggle clicked section
-        if (!isActive) content.classList.add('active');
-
-        event.stopPropagation();
-      });
-    });
-
-    // Click outside closes top-level accordions
-    document.body.addEventListener('click', () => {
-      document.querySelectorAll('.container > .accordion-content').forEach(c => c.classList.remove('active'));
-    });
   </script>
 </body>
 </html>
