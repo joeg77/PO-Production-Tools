@@ -118,6 +118,53 @@ function renameShippingLabels() {
   });
   return `✅ Renamed ${totalFiles} shipping label PDFs`;
 }
+// ======= Trading Partner PDF Renaming (Thursday) =======
+function renameTradingPartnerFilesThurs() {
+  let totalFiles = 0;
+  tradingPartners.forEach(partner => {
+    try {
+      Logger.log(`Renaming Thursday files in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+      let index = 1;
+      while (files.hasNext()) {
+        const file = files.next();
+        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}-thurs.pdf`);
+        index++;
+        totalFiles++;
+      }
+      Logger.log(`Renamed ${index - 1} Thursday files in folder ${partner.id}`);
+    } catch (e) {
+      Logger.log(`Error renaming Thursday files in folder ${partner.id}: ${e.message}`);
+    }
+  });
+  return `✅ Renamed ${totalFiles} trading partner PDFs with -thurs suffix`;
+}
+
+// ======= Shipping Labels Renaming (Thursday) =======
+function renameShippingLabelsThurs() {
+  let totalFiles = 0;
+  shippingLabelPartners.forEach(partner => {
+    try {
+      Logger.log(`Renaming Thursday shipping labels in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+      let index = 1;
+      while (files.hasNext()) {
+        const file = files.next();
+        // Remove trailing '-L' from original filename
+        const baseName = partner.filename.replace(/-L$/, '');
+        file.setName(`${baseName}${index > 1 ? `-${index}` : ''}-thurs-L.pdf`);
+        index++;
+        totalFiles++;
+      }
+      Logger.log(`Renamed ${index - 1} Thursday shipping labels in folder ${partner.id}`);
+    } catch (e) {
+      Logger.log(`Error renaming Thursday labels in folder ${partner.id}: ${e.message}`);
+    }
+  });
+  return `✅ Renamed ${totalFiles} shipping label PDFs with -thurs-L suffix`;
+}
 
 // ======= Shipping Manifests Renaming =======
 function renameShippingManifestPDFs() {
@@ -284,6 +331,58 @@ function prepareShippingDocuments() {
   } catch (e) {
     Logger.log(`Error in prepareShippingDocuments: ${e.message}`);
     return `⚠️ Failed to prepare shipping documents: ${e.message}`;
+  }
+}
+
+// ======= Email Prep =======
+function emailPrep() {
+  try {
+    // === Folder IDs ===
+    const sourceFolders = [
+      "1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY",
+      "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"
+    ];
+
+    const destinationFolders = [
+      "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK",
+      "16L13SDR6_bCFs_r6trB74GNnL4GwfxY-"
+    ];
+
+    let totalCopied = 0;
+
+    // === Iterate over source folders ===
+    sourceFolders.forEach(sourceId => {
+      const sourceFolder = DriveApp.getFolderById(sourceId);
+      const files = sourceFolder.getFilesByType(MimeType.PDF);
+
+      // For each file, copy to each destination
+      while (files.hasNext()) {
+        const file = files.next();
+
+        destinationFolders.forEach(destId => {
+          const destFolder = DriveApp.getFolderById(destId);
+
+          // If a file with the same name exists, remove it first
+          const existingFiles = destFolder.getFilesByName(file.getName());
+          while (existingFiles.hasNext()) {
+            existingFiles.next().setTrashed(true);
+          }
+
+          // Copy the file
+          file.makeCopy(file.getName(), destFolder);
+          totalCopied++;
+        });
+      }
+    });
+
+    const msg = `✅ Copied ${totalCopied} PDF(s) to both destination folders.`;
+    Logger.log(msg);
+    return msg;
+
+  } catch (e) {
+    const errMsg = `⚠️ emailPrep() failed: ${e.message}`;
+    Logger.log(errMsg);
+    return errMsg;
   }
 }
 
