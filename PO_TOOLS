@@ -213,6 +213,45 @@ function renameDDPOSFiles() {
     return `⚠️ Failed to rename DDPOS PDFs: ${e.message}`;
   }
 }
+// ======= Rename File Ext =======
+function renameFileToPDF() {
+  // Collect all relevant folder IDs
+  const allFolderIds = [
+    ...tradingPartners.map(p => p.id),
+    ...shippingLabelPartners.map(p => p.id),
+    ...shippingManifestPartners.map(p => p.id),
+    DDPOS_FOLDER_ID,
+    TRADING_PARTNER_DESTINATION_ID,
+    SHIPPING_LABEL_DESTINATION_ID,
+    SHIPPING_MANIFEST_DESTINATION_ID
+  ];
+
+  let totalRenamed = 0;
+
+  allFolderIds.forEach(folderId => {
+    try {
+      const folder = DriveApp.getFolderById(folderId);
+      const files = folder.getFiles();
+
+      while (files.hasNext()) {
+        const file = files.next();
+        const name = file.getName();
+
+        // Skip folders and files that already have an extension
+        if (!name.includes('.')) {
+          const newName = `${name}.pdf`;
+          file.setName(newName);
+          totalRenamed++;
+          Logger.log(`Renamed "${name}" to "${newName}" in folder ${folderId}`);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error processing folder ${folderId}: ${e.message}`);
+    }
+  });
+
+  return `✅ Renamed ${totalRenamed} file(s) to add .pdf extension`;
+}
 
 // ======= Copy Trading Partner PDFs =======
 function copyTradingPartnerPDFs() {
@@ -444,6 +483,181 @@ function purgeDailyShippingDocs() {
     return `⚠️ Failed to purge Daily Shipping Docs: ${e.message}`;
   }
 }
+
+
+
+// ======= Menards Shipping Extraction Script =======
+// ======= Menards Shipping Extraction Script =======
+// ======= Menards Shipping Extraction Script =======
+// ======= Menards Shipping Extraction Script =======
+
+
+/**
+ * Configuration settings for the script.
+ * @const
+ */
+const CONFIG = {
+  FOLDER_ID: '1NH19Eiq_Kc5uAEmdijSkuNdYIJYClHCU',
+  SHEET_ID: '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY',
+  SHEET_NAME: 'Sheet1',
+  SKU_MAP: {
+    '2-4':   { internalSKU: 'DD2083204',  weight: 8.5 },
+    '2-10':  { internalSKU: 'DD2083210',  weight: 20 },
+    '2-25':  { internalSKU: 'DD2083225',  weight: 49 },
+    '3-4':   { internalSKU: 'DD3103204',  weight: 8.8 },
+    '3-10':  { internalSKU: 'DD3103210',  weight: 20.4 },
+    '3-25':  { internalSKU: 'DD3103225',  weight: 49.8 },
+    'XL-2':  { internalSKU: 'DDXL152402', weight: 7.6 },
+    'XL-5':  { internalSKU: 'DDXL152405', weight: 18 },
+    'XL-15': { internalSKU: 'DDXL152415', weight: 52.5 },
+  },
+};
+
+/**
+ * Main function to process Menards PDFs from a Drive folder and log data to a Sheet.
+ */
+function extractMenardsShippingData() {
+  const sheet = SpreadsheetApp.openById(CONFIG.SHEET_ID).getSheetByName(CONFIG.SHEET_NAME);
+  sheet.clear();
+
+  const headers = [
+    'PKG_PACKAGE_ID', 'SHPTO_NAME', 'SHPTO_ADDRESS_1', 'SHPTO_ADDRESS_2', 'SHPTO_ADDRESS_3',
+    'SHPTO_CITY', 'SHPTO_STATE_PROV', 'SHPTO_POSTAL_CODE', 'SHPTO_COUNTRY_ID', 'PKG_TELEPHONE',
+    'PKG_SERVICE_TYPE', 'PKG_WEIGHT_ACTUAL', 'PKG_CUSTOM1', 'PKG_CUSTOM2', 'PKG_CUSTOM3',
+    'PKG_CUSTOM4', 'PKG_CUSTOM5', 'SHPTO_RESIDENTIAL', 'UOL_SOURCE', 'SHPTO_ATTN_LINE',
+    'SHPTO_COMPANY', 'MERCHANT_ID',
+  ];
+  sheet.appendRow(headers);
+
+  const folder = DriveApp.getFolderById(CONFIG.FOLDER_ID);
+  const files = folder.getFilesByType(MimeType.PDF);
+  let processedCount = 0;
+
+  while (files.hasNext()) {
+    const file = files.next();
+    const poNumber = file.getName().replace(/\.pdf$/i, '');
+    let ocrFileId = null;
+
+    try {
+      const text = getOcrText_(file);
+      ocrFileId = text.tempDocId;
+
+      const shipToData = parseShipToBlock_(text.content);
+      const itemData = parseItemDetails_(text.content);
+      
+      const rowData = [
+        poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
+        'STANDARD', itemData.weight, itemData.internalSku, poNumber, '', poNumber, itemData.quantity, 'N', '', shipToData.name, shipToData.name, 'menards',
+      ];
+      sheet.appendRow(rowData);
+      processedCount++;
+
+    } catch (e) {
+      Logger.log(`Error processing ${file.getName()}: ${e.message}`);
+      sheet.appendRow([poNumber, `ERROR: ${e.message}`]);
+    } finally {
+      if (ocrFileId) {
+        Drive.Files.remove(ocrFileId);
+      }
+    }
+  }
+  Logger.log(`✅ Extracted shipping info from ${processedCount} PDF(s).`);
+}
+
+/**
+ * Extracts text from a PDF file using OCR by converting it to a temporary Google Doc.
+ * @param {GoogleAppsScript.Drive.File} file The PDF file to process.
+ * @return {{content: string, tempDocId: string}} An object containing the extracted text and the ID of the temporary file.
+ * @private
+ */
+function getOcrText_(file) {
+  const resource = { title: `temp-ocr-${file.getName()}`, mimeType: MimeType.GOOGLE_DOCS };
+  const ocrFile = Drive.Files.create(resource, file.getBlob(), { ocr: true });
+  const doc = DocumentApp.openById(ocrFile.id);
+  const text = doc.getBody().getText();
+  return { content: text, tempDocId: ocrFile.id };
+}
+
+/**
+ * Parses the "Ship To" block from the OCR text to extract address details.
+ * @param {string} text The full text content from the PDF.
+ * @return {{name: string, address: string, city: string, state: string, postal: string, phone: string}} The parsed address information.
+ * @private
+ */
+function parseShipToBlock_(text) {
+  const data = { name: '', address: '', city: '', state: '', postal: '', phone: '' };
+  const match = text.match(/Ship To:\s*([\s\S]*?)(?=Guest Information:|Bill To:)/i);
+
+  if (match && match[1]) {
+    const lines = match[1].split('\n').map(line => line.trim()).filter(Boolean);
+
+    const cszIndex = lines.findIndex(line => /,\s*[A-Z]{2}\s*\d{5}/.test(line));
+    const phoneIndex = lines.findIndex(line => /Phone:/.test(line));
+    
+    // Find the Name first by filtering out other known line types
+    const nameLine = lines.find((line, index) => {
+      return index !== cszIndex && index !== phoneIndex && /^[A-Z\s]+$/i.test(line) && !/^\d{4}$/.test(line);
+    });
+    data.name = nameLine || '';
+
+    // Process City/State/ZIP line
+    if (cszIndex !== -1) {
+      const cszMatch = lines[cszIndex].match(/(.+?),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
+      if (cszMatch) {
+        let potentialCityAndAddress = cszMatch[1].trim();
+        data.state = cszMatch[2].trim();
+        data.postal = cszMatch[3].trim();
+        
+        // If the line contains digits and we have a store name, it's merged. Split it.
+        if (/\d/.test(potentialCityAndAddress) && data.name) {
+          const parts = potentialCityAndAddress.split(new RegExp(`\\s+${data.name}$`, 'i'));
+          data.address = parts[0].trim();
+          data.city = data.name;
+        } else {
+          data.city = potentialCityAndAddress;
+        }
+      }
+    }
+    
+    // Process Phone line
+    if (phoneIndex !== -1) {
+      const phoneMatch = lines[phoneIndex].match(/Phone:\s*([\d-]+)/i);
+      if(phoneMatch) data.phone = phoneMatch[1].trim();
+    }
+    
+    // Final check for address if it wasn't in a merged line
+    if (!data.address) {
+      const addressLine = lines.find(line => /\d/.test(line) && !line.includes(data.postal) && !/Phone:/.test(line) && !/^\d{4}$/.test(line));
+      if(addressLine) data.address = addressLine;
+    }
+  }
+  return data;
+}
+
+/**
+ * Parses the item details from the OCR text to get SKU, quantity, and weight.
+ * @param {string} text The full text content from the PDF.
+ * @return {{vendorSku: string, internalSku: string, quantity: string, weight: (number|string)}} The parsed item details.
+ * @private
+ */
+function parseItemDetails_(text) {
+  const data = { vendorSku: '', internalSku: '', quantity: '', weight: '' };
+  
+  const vendorSkuMatch = text.match(/Vendor Part #:\s*([\w-]+)/i);
+  data.vendorSku = vendorSkuMatch ? vendorSkuMatch[1].trim() : '';
+
+  if (data.vendorSku && CONFIG.SKU_MAP[data.vendorSku]) {
+    data.internalSku = CONFIG.SKU_MAP[data.vendorSku].internalSKU;
+    data.weight = CONFIG.SKU_MAP[data.vendorSku].weight;
+  }
+  
+  const qtyMatch = text.match(/\d{7}\s+DIGDE001 Special Order\s+(\d+)\s+[\d.]+\s+Package/i);
+  data.quantity = qtyMatch ? qtyMatch[1].trim() : '';
+  
+  return data;
+}
+
+
 
 
 // ======= HTML Service Entrypoint =======
