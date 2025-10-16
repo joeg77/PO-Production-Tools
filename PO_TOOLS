@@ -492,6 +492,7 @@ function purgeDailyShippingDocs() {
 // ======= Menards Shipping Extraction Script =======
 
 
+
 /**
  * Configuration settings for the script.
  * @const
@@ -543,13 +544,19 @@ function extractMenardsShippingData() {
       ocrFileId = text.tempDocId;
 
       const shipToData = parseShipToBlock_(text.content);
-      const itemData = parseItemDetails_(text.content);
+      const lineItems = parseLineItems_(text.content);
       
-      const rowData = [
-        poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
-        'STANDARD', itemData.weight, itemData.internalSku, poNumber, '', poNumber, itemData.quantity, 'N', '', shipToData.name, shipToData.name, 'menards',
-      ];
-      sheet.appendRow(rowData);
+      if (lineItems.length === 0) {
+        throw new Error('No line items could be parsed from the PDF.');
+      }
+
+      for (const item of lineItems) {
+        const rowData = [
+          poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
+          'STANDARD', item.weight, item.internalSku, poNumber, '', poNumber, item.quantity, 'N', '', shipToData.name, shipToData.name, 'menards',
+        ];
+        sheet.appendRow(rowData);
+      }
       processedCount++;
 
     } catch (e) {
@@ -565,14 +572,32 @@ function extractMenardsShippingData() {
 }
 
 /**
- * Extracts text from a PDF file using OCR by converting it to a temporary Google Doc.
+ * Extracts text from a PDF file using OCR, with a retry mechanism for API errors.
  * @param {GoogleAppsScript.Drive.File} file The PDF file to process.
- * @return {{content: string, tempDocId: string}} An object containing the extracted text and the ID of the temporary file.
+ * @return {{content: string, tempDocId: string}} An object with the extracted text and temp file ID.
  * @private
  */
 function getOcrText_(file) {
   const resource = { title: `temp-ocr-${file.getName()}`, mimeType: MimeType.GOOGLE_DOCS };
-  const ocrFile = Drive.Files.create(resource, file.getBlob(), { ocr: true });
+  let ocrFile;
+
+  // Try the API call up to 3 times.
+  for (let i = 0; i < 3; i++) {
+    try {
+      ocrFile = Drive.Files.create(resource, file.getBlob(), { ocr: true });
+      // If the call is successful, break out of the retry loop.
+      break;
+    } catch (e) {
+      Logger.log(`API call failed on attempt ${i + 1}. Retrying in 2 seconds. Error: ${e.message}`);
+      // If this was the last attempt, give up and throw the error.
+      if (i === 2) {
+        throw e;
+      }
+      // Wait for 2 seconds before the next attempt.
+      Utilities.sleep(2000);
+    }
+  }
+
   const doc = DocumentApp.openById(ocrFile.id);
   const text = doc.getBody().getText();
   return { content: text, tempDocId: ocrFile.id };
@@ -590,25 +615,18 @@ function parseShipToBlock_(text) {
 
   if (match && match[1]) {
     const lines = match[1].split('\n').map(line => line.trim()).filter(Boolean);
-
     const cszIndex = lines.findIndex(line => /,\s*[A-Z]{2}\s*\d{5}/.test(line));
     const phoneIndex = lines.findIndex(line => /Phone:/.test(line));
-    
-    // Find the Name first by filtering out other known line types
     const nameLine = lines.find((line, index) => {
       return index !== cszIndex && index !== phoneIndex && /^[A-Z\s]+$/i.test(line) && !/^\d{4}$/.test(line);
     });
     data.name = nameLine || '';
-
-    // Process City/State/ZIP line
     if (cszIndex !== -1) {
       const cszMatch = lines[cszIndex].match(/(.+?),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
       if (cszMatch) {
         let potentialCityAndAddress = cszMatch[1].trim();
         data.state = cszMatch[2].trim();
         data.postal = cszMatch[3].trim();
-        
-        // If the line contains digits and we have a store name, it's merged. Split it.
         if (/\d/.test(potentialCityAndAddress) && data.name) {
           const parts = potentialCityAndAddress.split(new RegExp(`\\s+${data.name}$`, 'i'));
           data.address = parts[0].trim();
@@ -618,14 +636,10 @@ function parseShipToBlock_(text) {
         }
       }
     }
-    
-    // Process Phone line
     if (phoneIndex !== -1) {
       const phoneMatch = lines[phoneIndex].match(/Phone:\s*([\d-]+)/i);
       if(phoneMatch) data.phone = phoneMatch[1].trim();
     }
-    
-    // Final check for address if it wasn't in a merged line
     if (!data.address) {
       const addressLine = lines.find(line => /\d/.test(line) && !line.includes(data.postal) && !/Phone:/.test(line) && !/^\d{4}$/.test(line));
       if(addressLine) data.address = addressLine;
@@ -635,27 +649,40 @@ function parseShipToBlock_(text) {
 }
 
 /**
- * Parses the item details from the OCR text to get SKU, quantity, and weight.
+ * Parses all line items from the OCR text.
  * @param {string} text The full text content from the PDF.
- * @return {{vendorSku: string, internalSku: string, quantity: string, weight: (number|string)}} The parsed item details.
+ * @return {Array<Object>} A list of item objects, each with vendorSku, internalSku, quantity, and weight.
  * @private
  */
-function parseItemDetails_(text) {
-  const data = { vendorSku: '', internalSku: '', quantity: '', weight: '' };
-  
-  const vendorSkuMatch = text.match(/Vendor Part #:\s*([\w-]+)/i);
-  data.vendorSku = vendorSkuMatch ? vendorSkuMatch[1].trim() : '';
+function parseLineItems_(text) {
+  const items = [];
+  // This final regex is built based on the actual OCR output from the log.
+  const itemRegex = /1002485\s+DIGDE001 Special Order\s+(\d+)\s+[\d,.]+\s+Package\s+[\d,.]+\s+Vendor Part #:\s*([\w-]+)/g;
+  let match;
 
-  if (data.vendorSku && CONFIG.SKU_MAP[data.vendorSku]) {
-    data.internalSku = CONFIG.SKU_MAP[data.vendorSku].internalSKU;
-    data.weight = CONFIG.SKU_MAP[data.vendorSku].weight;
+  while ((match = itemRegex.exec(text)) !== null) {
+    // NOTE: The capture group order has changed.
+    // match[1] is now the Quantity.
+    // match[2] is now the Vendor SKU.
+    const quantity = match[1].trim();
+    const vendorSku = match[2].trim();
+    const mappedSku = CONFIG.SKU_MAP[vendorSku] || { internalSKU: `NOT_FOUND: ${vendorSku}`, weight: '' };
+
+    items.push({
+      vendorSku: vendorSku,
+      quantity: quantity,
+      internalSku: mappedSku.internalSKU,
+      weight: mappedSku.weight
+    });
   }
-  
-  const qtyMatch = text.match(/\d{7}\s+DIGDE001 Special Order\s+(\d+)\s+[\d.]+\s+Package/i);
-  data.quantity = qtyMatch ? qtyMatch[1].trim() : '';
-  
-  return data;
+  return items;
 }
+
+
+
+
+
+
 
 
 
