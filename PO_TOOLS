@@ -678,8 +678,172 @@ function parseLineItems_(text) {
   return items;
 }
 
+// ======= WCS Shipping Extraction Script =======
+// ======= WCS Shipping Extraction Script =======
+// ======= WCS Shipping Extraction Script =======
+// ======= WCS Shipping Extraction Script =======
+// ======= WCS Shipping Extraction Script =======
 
 
+/**
+ * Configuration settings for the WCS script.
+ * @const
+ */
+const CONFIG_WCS = {
+  FOLDER_ID: '1yzEmFqG-T50m1sao1-f0rzGzH5sXGwc6',
+  SHEET_ID: '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY',
+  SHEET_NAME: 'Sheet1',
+  SKU_MAP: {
+    'DDAC-Tool-C': { internalSKU: 'DDAC-TOOL',  weight: 19.9 },
+  },
+};
+
+/**
+ * Main function to process WCS PDFs from a Drive folder and log data to a Sheet.
+ */
+function extractWCSData() {
+  const sheet = SpreadsheetApp.openById(CONFIG_WCS.SHEET_ID).getSheetByName(CONFIG_WCS.SHEET_NAME) || 
+                SpreadsheetApp.openById(CONFIG_WCS.SHEET_ID).insertSheet(CONFIG_WCS.SHEET_NAME);
+  sheet.clear();
+
+  const headers = [
+    'PKG_PACKAGE_ID', 'SHPTO_NAME', 'SHPTO_ADDRESS_1', 'SHPTO_ADDRESS_2', 'SHPTO_ADDRESS_3',
+    'SHPTO_CITY', 'SHPTO_STATE_PROV', 'SHPTO_POSTAL_CODE', 'SHPTO_COUNTRY_ID', 'PKG_TELEPHONE',
+    'PKG_SERVICE_TYPE', 'PKG_WEIGHT_ACTUAL', 'PKG_CUSTOM1', 'PKG_CUSTOM2', 'PKG_CUSTOM3',
+    'PKG_CUSTOM4', 'PKG_CUSTOM5', 'SHPTO_RESIDENTIAL', 'UOL_SOURCE', 'SHPTO_ATTN_LINE',
+    'SHPTO_COMPANY', 'MERCHANT_ID',
+  ];
+  sheet.appendRow(headers);
+
+  // This helper function is assumed to exist from the previous Menards script
+  // If it doesn't, you would need to include it in your script file.
+  if (typeof getOcrText_ === 'undefined') {
+    throw new Error('The helper function getOcrText_ is missing from your script file.');
+  }
+
+  const folder = DriveApp.getFolderById(CONFIG_WCS.FOLDER_ID);
+  const files = folder.getFilesByType(MimeType.PDF);
+  let processedCount = 0;
+
+  while (files.hasNext()) {
+    const file = files.next();
+    let ocrFileId = null;
+
+    try {
+      const text = getOcrText_(file); 
+      ocrFileId = text.tempDocId;
+
+      const poNumberMatch = text.content.match(/PO #\s*(\w+)/);
+      const poNumber = poNumberMatch ? poNumberMatch[1] : `NO_PO_FOUND_IN_${file.getName()}`;
+      
+      const shipToData = parseWCSShipToBlock_(text.content);
+      const lineItems = parseWCSLineItems_(text.content);
+      
+      if (lineItems.length === 0) {
+        throw new Error('No line items could be parsed.');
+      }
+
+      for (const item of lineItems) {
+        const rowData = [
+          poNumber, shipToData.name, shipToData.address1, shipToData.address2, '', 
+          shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
+          'STANDARD', item.weight, item.internalSku, poNumber, '', poNumber, item.quantity, 
+          'Y', '', shipToData.name, shipToData.company, 'wcs',
+        ];
+        sheet.appendRow(rowData);
+      }
+      processedCount++;
+
+    } catch (e) {
+      Logger.log(`Error processing ${file.getName()}: ${e.message}`);
+      sheet.appendRow([file.getName(), `ERROR: ${e.message}`]);
+    } finally {
+      if (ocrFileId) {
+        Drive.Files.remove(ocrFileId);
+      }
+    }
+  }
+  Logger.log(`✅ Extracted shipping info from ${processedCount} WCS PDF(s).`);
+}
+
+
+/**
+ * Parses the WCS "Ship To" block from OCR text by finding the block between "Prepared By" and "Memo".
+ * @param {string} text The full text content from the PDF.
+ * @return {Object} The parsed address information.
+ * @private
+ */
+function parseWCSShipToBlock_(text) {
+  const data = { name: '', company: '', address1: '', address2: '', city: '', state: '', postal: '', phone: '' };
+  // New, more reliable regex to find the correct address block.
+  const shipToMatch = text.match(/Prepared By:[\s\S]*?\n([\s\S]*?)(?=Memo|Customer Phone|Item Code)/);
+  
+  if (shipToMatch && shipToMatch[1]) {
+    const lines = shipToMatch[1].split('\n').map(l => l.trim()).filter(Boolean);
+    
+    const phoneMatch = text.match(/Customer Phone\s*([\d\(\)\s-]+)/);
+    if(phoneMatch) data.phone = phoneMatch[1].trim();
+
+    const cszLine = lines.find(l => /[A-Z]{2}\s+\d{5}/.test(l));
+    if (cszLine) {
+      const cszMatch = cszLine.match(/(.+?)\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
+      if (cszMatch) {
+          data.city = cszMatch[1].trim();
+          data.state = cszMatch[2].trim();
+          data.postal = cszMatch[3].trim();
+      }
+    }
+    
+    // Process remaining lines for name, company, and address
+    const addressLines = lines.filter(l => l !== cszLine && l !== 'United States');
+    data.name = addressLines.shift() || '';
+    
+    // Check if the next line looks like a company name (doesn't start with a number or contain address keywords)
+    if (addressLines.length > 0 && !/^\d/.test(addressLines[0]) && !/rd|st|ln|blvd|rd/i.test(addressLines[0])) {
+      data.company = addressLines.shift() || '';
+    }
+
+    data.address1 = addressLines.shift() || '';
+    data.address2 = addressLines.join(' '); 
+  }
+  return data;
+}
+
+/**
+ * Parses all WCS line items from the OCR text using a columnar approach.
+ * @param {string} text The full text content from the PDF.
+ * @return {Array<Object>} A list of item objects.
+ * @private
+ */
+function parseWCSLineItems_(text) {
+  const items = [];
+  const itemCodeBlockMatch = text.match(/Item Code\s*([\s\S]*?)\s*Quantity/);
+  const quantityBlockMatch = text.match(/Quantity\s*([\s\S]*?)\s*Description/);
+
+  if (itemCodeBlockMatch && quantityBlockMatch) {
+    const itemCodes = itemCodeBlockMatch[1].match(/(DDAC-Tool-C|Shipping-PO Drop)/g) || [];
+    const quantities = quantityBlockMatch[1].split('\n').map(l => l.trim()).filter(Boolean);
+
+    if (itemCodes.length > 0 && itemCodes.length === quantities.length) {
+      for (let i = 0; i < itemCodes.length; i++) {
+        const itemCode = itemCodes[i];
+        const quantity = quantities[i];
+        
+        if (itemCode === 'Shipping-PO Drop') continue;
+        
+        const mappedSku = CONFIG_WCS.SKU_MAP[itemCode] || { internalSKU: `NOT_FOUND: ${itemCode}`, weight: '' };
+
+        items.push({
+          itemCode: itemCode,
+          quantity: quantity,
+          internalSku: mappedSku.internalSKU,
+          weight: mappedSku.weight
+        });
+      }
+    }
+  }
+  return items;
+}
 
 
 
