@@ -48,6 +48,12 @@ ui.createMenu('Outbound')
 .addItem('Export To: document-PS-lowes-thurs', 'exportPSLowesThurs')
 .addItem('Export To: document-PS-lowes-sun', 'exportPSLowesSun')
 
+// Menards
+.addItem('--- 🏢 Menards ---', 'doNothing')
+.addItem('Export To: document-PS-menards', 'exportPSMenards')
+.addItem('Export To: document-PS-menards-thurs', 'exportPSMenardsThurs')
+.addItem('Export To: document-PS-menards-sun', 'exportPSMenardsSun')
+
 // Sam's
 .addItem('--- 🛒 Sams ---', 'doNothing')
 .addItem('Export To: document-PS-sams', 'exportPSSams')
@@ -61,12 +67,12 @@ ui.createMenu('Outbound')
 .addToUi();
 
 // Menu 3: Sheet Tools
-ui.createMenu('Sheet Tools')
+ui.createMenu('Clean Up')
 .addItem('--- 🧹 Maintenance ---', 'doNothing')
 .addItem('Reset Formatting', 'resetFormatting')
 .addItem('Delete Sheet', 'clearSheet')
-.addItem('Clean Trading Partner Order Files', 'purgeFiles')
-.addItem('Purge Exported CSV Files', 'purgeExportedCSVs')
+.addItem('Purge Downloads', 'purgeFiles')
+.addItem('Purge Exports', 'purgeExportedCSVs')
 .addToUi();
 }
 
@@ -337,23 +343,27 @@ SpreadsheetApp.getUi().alert(`✅ Combined CSV "${outputFilename}" created in PO
 }
 
 function combineCSVFiles() {
-combineCSVFilesCore([
-"document-PS-homedepot.csv",
-"document-PS-lowes.csv",
-"document-PS-amazon.csv"
-], "document-PS-combined.csv");
+  combineCSVFilesCore([
+    "document-PS-homedepot.csv",
+    "document-PS-lowes.csv",
+    "document-PS-amazon.csv",
+    "document-PS-menards.csv"   // <-- added Menards daily CSV
+  ], "document-PS-combined.csv");
 }
 
 function combineSundayCSVFiles() {
-combineCSVFilesCore([
-"document-PS-homedepot-thurs.csv",
-"document-PS-homedepot-sun.csv",
-"document-PS-lowes-thurs.csv",
-"document-PS-lowes-sun.csv",
-"document-PS-amazon-thurs.csv",
-"document-PS-amazon-sun.csv"
-], "document-PS-combined-sun.csv");
+  combineCSVFilesCore([
+    "document-PS-homedepot-thurs.csv",
+    "document-PS-homedepot-sun.csv",
+    "document-PS-lowes-thurs.csv",
+    "document-PS-lowes-sun.csv",
+    "document-PS-amazon-thurs.csv",
+    "document-PS-amazon-sun.csv",
+    "document-PS-menards-thurs.csv",  // <-- added Menards Thurs
+    "document-PS-menards-sun.csv"     // <-- added Menards Sun
+  ], "document-PS-combined-sun.csv");
 }
+
 
 // Import Amazon → Sheet (no auto-export)
 function importPSAmazon() {
@@ -822,6 +832,7 @@ function purgeExportedCSVs() {
 function purgeFiles() {
   const folderIds = [
     '1D67NuVHGp9ESn9BIwsUiGPr10-531J8O',
+    '112KbyDBh1blWZaYIv3JPwTAs6zQ4gWGt',
     '1xJJA6uJlSEJC2s9spfn0ShWwWCx3v4Qi',
     '1wYO_YGXpvaIAnW0kDmrgRDUHiOmck0hX',
     '1t3rEMKX3gtkXxmtcJegvPSmJlEsweNy9',
@@ -847,5 +858,56 @@ function purgeFiles() {
   SpreadsheetApp.getUi().alert(`✅ Purge complete. Total files deleted: ${totalDeleted}`);
 }
 
+// --- Export Menards data to CSV ---
+// --- Menards Export Functions ---
+// --- Helper to export active sheet to Menards folder AND PO Exports folder ---
+
+
+function exportActiveSheetToMenardsCSV(filename) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Sheet1');
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('❌ Sheet1 not found.');
+    return;
+  }
+
+  const csvContent = convertRangeToCsv(sheet);
+  if (!csvContent.trim()) {
+    SpreadsheetApp.getUi().alert('❌ Sheet1 is empty. Nothing to export.');
+    return;
+  }
+
+  const blob = Utilities.newBlob(csvContent, 'text/csv', filename);
+
+  // --- Menards folder ---
+  const menardsFolder = DriveApp.getFolderById('112KbyDBh1blWZaYIv3JPwTAs6zQ4gWGt');
+  const existingMenardsFiles = menardsFolder.getFilesByName(filename);
+  while (existingMenardsFiles.hasNext()) existingMenardsFiles.next().setTrashed(true);
+  menardsFolder.createFile(blob);
+
+  // --- PO Exports folder ---
+  const exportsFolder = DriveApp.getFolderById('1P4RNXSlls4BJb2n7hvFUJxUSi_TX9O31');
+  const existingExportsFiles = exportsFolder.getFilesByName(filename);
+  while (existingExportsFiles.hasNext()) existingExportsFiles.next().setTrashed(true);
+  exportsFolder.createFile(blob);
+
+  SpreadsheetApp.getUi().alert(`✅ '${filename}' exported to Menards folder AND PO Exports folder.`);
+}
+// ================== Menards Export Functions ==================
+
+// Standard export
+function exportPSMenards() {
+  exportActiveSheetToMenardsCSV('document-PS-menards.csv');
+}
+
+// Thursday export
+function exportPSMenardsThurs() {
+  exportActiveSheetToMenardsCSV('document-PS-menards-thurs.csv');
+}
+
+// Sunday export
+function exportPSMenardsSun() {
+  exportActiveSheetToMenardsCSV('document-PS-menards-sun.csv');
+}
 
 
