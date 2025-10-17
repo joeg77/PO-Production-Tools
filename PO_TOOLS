@@ -166,6 +166,61 @@ function renameShippingLabelsThurs() {
   return `✅ Renamed ${totalFiles} shipping label PDFs with -thurs-L suffix`;
 }
 
+// ======= Trading Partner PDF Renaming (Sunday) =======
+function renameTradingPartnerFilesSun() {
+  let totalFiles = 0;
+  tradingPartners.forEach(partner => {
+    try {
+      Logger.log(`Renaming Sunday files in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+      let index = 1;
+      while (files.hasNext()) {
+        const file = files.next();
+        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}-sun.pdf`);
+        index++;
+        totalFiles++;
+      }
+      Logger.log(`Renamed ${index - 1} Sunday files in folder ${partner.id}`);
+    } catch (e) {
+      Logger.log(`Error renaming Sunday files in folder ${partner.id}: ${e.message}`);
+    }
+  });
+  return `✅ Renamed ${totalFiles} trading partner PDFs with -sun suffix`;
+}
+
+// ======= Shipping Labels Renaming (Sunday) =======
+function renameShippingLabelsSun() {
+  let totalFiles = 0;
+  shippingLabelPartners.forEach(partner => {
+    try {
+      Logger.log(`Renaming Sunday shipping labels in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+      let index = 1;
+      while (files.hasNext()) {
+        const file = files.next();
+        // Remove trailing '-L' from original filename
+        const baseName = partner.filename.replace(/-L$/, '');
+        file.setName(`${baseName}${index > 1 ? `-${index}` : ''}-sun-L.pdf`);
+        index++;
+        totalFiles++;
+      }
+      Logger.log(`Renamed ${index - 1} Sunday shipping labels in folder ${partner.id}`);
+    } catch (e) {
+      Logger.log(`Error renaming Sunday labels in folder ${partner.id}: ${e.message}`);
+    }
+  });
+  return `✅ Renamed ${totalFiles} shipping label PDFs with -sun-L suffix`;
+}
+
+
+
+
+
+
+
+
 // ======= Shipping Manifests Renaming =======
 function renameShippingManifestPDFs() {
   let totalFiles = 0;
@@ -347,8 +402,8 @@ function copyShippingManifestPDFs() {
 function prepareShippingDocuments() {
   try {
     const SOURCE_FOLDERS = [
-      "1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp", // Source folder 1
-      "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"  // Source folder 2
+      "1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp", // Final PO PDF Folder
+      "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"  // All Combined Labels Folder
     ];
     const DESTINATION_FOLDER_ID = "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK";
     const destination = DriveApp.getFolderById(DESTINATION_FOLDER_ID);
@@ -378,13 +433,13 @@ function emailPrep() {
   try {
     // === Folder IDs ===
     const sourceFolders = [
-      "1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY",
-      "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"
+      "1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY", // All Combined Packing Slips Folder
+      "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"  // All Combined Labels Folder
     ];
 
     const destinationFolders = [
-      "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK",
-      "16L13SDR6_bCFs_r6trB74GNnL4GwfxY-"
+      "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK", // PO Production Folder
+      "16L13SDR6_bCFs_r6trB74GNnL4GwfxY-"  // 1st Previous Day Folder, adds a copy for backup
     ];
 
     let totalCopied = 0;
