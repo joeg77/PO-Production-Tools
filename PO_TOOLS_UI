@@ -4,36 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PO PDF Tools</title>
-
   <style>
-    /* Reset some defaults for better mobile experience */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
-      background-color: #121212; /* Dark background */
-      color: #e0e0e0; /* Light text for contrast */
+      background-color: #121212;
+      color: #e0e0e0;
       padding: 10px;
     }
-
     h1 {
       text-align: center;
       font-size: 5rem;
       margin: 20px 0;
       color: #ffffff;
     }
-
-    /* Accordion container */
     .accordion {
       max-width: 100%;
       margin: 0 auto;
     }
-
-    /* Style the accordion items */
     details {
       background-color: #1e1e1e;
       border: 1px solid #333;
@@ -41,8 +29,6 @@
       border-radius: 8px;
       overflow: hidden;
     }
-
-    /* Style the summary (button) */
     summary {
       padding: 20px;
       font-size: 4.5rem;
@@ -55,26 +41,19 @@
       align-items: center;
       user-select: none;
     }
-
-    /* Add a chevron icon */
     summary::after {
       content: '\25BC';
       font-size: 1em;
       transition: transform 0.3s ease;
     }
-
     details[open] summary::after {
       transform: rotate(180deg);
     }
-
-    /* Panel content */
     .panel {
       padding: 20px;
       background-color: #212121;
       border-top: 1px solid #333;
     }
-
-    /* Buttons */
     .remote-btn {
       width: 100%;
       padding: 25px;
@@ -87,24 +66,18 @@
       margin-bottom: 10px;
       transition: background 0.2s ease, transform 0.1s ease;
     }
-
-    .remote-btn:hover {
-      background: #444;
-    }
-
-    .remote-btn:active {
-      transform: scale(0.98);
-    }
-
-    /* Color accents */
+    .remote-btn:hover { background: #444; }
+    .remote-btn:active { transform: scale(0.98); }
     .pdf { background: #6f42c1; }
     .emailprep { background: #009688; }
     .purge { background: #e63946; }
-
+    .menards { background: #4caf50; }
+    .wcs { background: #ff9800; } 
     .pdf:hover { background: #7f56d9; }
     .emailprep:hover { background: #00796b; }
     .purge:hover { background: #c53030; }
-
+    .menards:hover { background: #43a047; }
+    .wcs:hover { background: #f57c00; }
     #toast {
       position: fixed;
       bottom: 20px;
@@ -117,19 +90,22 @@
       z-index: 1000;
       font-size: 1.2rem;
     }
-
-    /* Touch-friendly */
     @media (hover: none) {
-      summary {
-        padding: 25px;
-      }
+      summary { padding: 25px; }
     }
   </style>
 </head>
-
 <body>
   <h1>PO PDF Tools</h1>
   <div class="accordion">
+
+    <details>
+      <summary>PDF Reading Operations</summary>
+      <div class="panel">
+        <button class="remote-btn menards" onclick="runFunction('extractMenardsShippingData')">Extract Menards Shipping Data</button>
+        <button class="remote-btn wcs" onclick="runFunction('extractWCSData')">Extract WCS Shipping Data</button>
+      </div>
+    </details>
 
     <details>
       <summary>PDF Operations</summary>
@@ -145,18 +121,32 @@
             <button class="remote-btn pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
           </div>
         </details>
-        
+
         <details>
           <summary>Friday Operations</summary>
-            <div class="panel">
-              <details>
-                <summary>Renaming (uses -thurs functions)</summary>
-                  <div class="panel">
-                    <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFilesThurs')">Rename Trading Partner Packing Slips (-thurs)</button>
-                    <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsThurs')">Rename Shipping Labels (-thurs)</button>
-                  </div>
-              </details>
-            </div>
+          <div class="panel">
+            <details>
+              <summary>Renaming (-thurs)</summary>
+              <div class="panel">
+                <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFilesThurs')">Rename Trading Partner Packing Slips (-thurs)</button>
+                <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsThurs')">Rename Shipping Labels (-thurs)</button>
+              </div>
+            </details>
+          </div>
+        </details>
+        
+        <details>
+          <summary>Weekend Operations</summary>
+          <div class="panel">
+            <details>
+              <summary>Renaming (-sun)</summary>
+              <div class="panel">
+                <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFilesSun')">Rename Trading Partner Packing Slips (-sun)</button>
+                <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsSun')">Rename Shipping Labels (-sun)</button>
+                <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFsSun')">Rename Shipping Manifests (-sun)</button>
+              </div>
+            </details>
+          </div>
         </details>
 
         <details>
