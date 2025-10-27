@@ -78,18 +78,36 @@
     .purge:hover { background: #c53030; }
     .menards:hover { background: #43a047; }
     .wcs:hover { background: #f57c00; }
+
+    /* --- UPDATED TOAST CSS --- */
     #toast {
       position: fixed;
       bottom: 20px;
-      right: 20px;
+      left: 10px;  /* Spans the width on mobile */
+      right: 10px;
       background-color: #333;
       color: white;
-      padding: 12px 20px;
-      border-radius: 5px;
+      padding: 20px 24px;   /* Increased padding */
+      border-radius: 8px;
       display: none;
       z-index: 1000;
-      font-size: 1.2rem;
+      font-size: 2.0rem;    /* Significantly larger font */
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5); /* Added shadow for visibility */
     }
+
+    /* On larger screens, move it back to the corner */
+    @media (min-width: 768px) {
+      #toast {
+        left: auto; /* Reset left */
+        right: 20px;
+        bottom: 20px;
+        max-width: 450px; /* Give it a max width */
+        text-align: left; /* Reset text alignment */
+      }
+    }
+    /* --- END UPDATED CSS --- */
+
     @media (hover: none) {
       summary { padding: 25px; }
     }
@@ -98,14 +116,6 @@
 <body>
   <h1>PO PDF Tools</h1>
   <div class="accordion">
-
-    <details>
-      <summary>PDF Reading Operations</summary>
-      <div class="panel">
-        <button class="remote-btn menards" onclick="runFunction('extractMenardsShippingData')">Extract Menards Shipping Data</button>
-        <button class="remote-btn wcs" onclick="runFunction('extractWCSData')">Extract WCS Shipping Data</button>
-      </div>
-    </details>
 
     <details>
       <summary>PDF Operations</summary>
@@ -118,7 +128,7 @@
             <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
             <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
             <button class="remote-btn pdf" onclick="runFunction('renameFileToPDF')">Rename Files With No Extension to PDF</button>
-            <button class="remote-btn pdf" onclick="runFunction('renameDDPOSFiles')">Rename DDPOS Files</button>
+            
           </div>
         </details>
 
@@ -130,6 +140,7 @@
               <div class="panel">
                 <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFilesThurs')">Rename Trading Partner Packing Slips (-thurs)</button>
                 <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsThurs')">Rename Shipping Labels (-thurs)</button>
+                <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFsThurs')">Rename Shipping Manifests (-thurs)</button>
               </div>
             </details>
           </div>
@@ -161,8 +172,8 @@
         <details>
           <summary>Prepping</summary>
           <div class="panel">
-            <button class="remote-btn pdf" onclick="runFunction('prepareShippingDocuments')">Prepare Shipping Documents</button>
-            <button class="remote-btn emailprep" onclick="runFunction('emailPrep')">Run Email Prep</button>
+            <button class="remote-btn pdf" onclick="runFunction('moveShippingDocuments')">Move Shipping Documents To Email Folder</button>
+            <button class="remote-btn emailprep" onclick="runFunction('prepareShippingDocs')">Run Email Prep</button>
           </div>
         </details>
 
@@ -172,7 +183,7 @@
     <details>
       <summary>Purge Operations</summary>
       <div class="panel">
-        <button class="remote-btn purge" onclick="runFunction('purgeDailyShippingDocs')">Purge Daily Shipping Docs</button>
+        <button class="remote-btn purge" onclick="runFunction('purgeDailyShippingDocs')">Purge Daily Shipping Doc Folder</button>
         <button class="remote-btn purge" onclick="runFunction('purgeAllPDFs')">Purge All PDFs</button>
       </div>
     </details>
