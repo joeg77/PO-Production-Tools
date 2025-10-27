@@ -172,6 +172,8 @@
         <details>
           <summary>Prepping</summary>
           <div class="panel">
+            <button class="remote-btn pdf" onclick="runFunction('emailPageCountReport')">Generate Pack Count</button>
+            <button class="remote-btn pdf" onclick="runFunction('mergeManifests')">Merge Manifests</button>
             <button class="remote-btn pdf" onclick="runFunction('moveShippingDocuments')">Move Shipping Documents To Email Folder</button>
             <button class="remote-btn emailprep" onclick="runFunction('prepareShippingDocs')">Run Email Prep</button>
           </div>
