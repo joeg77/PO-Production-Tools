@@ -1,16 +1,26 @@
-// ========================== PDF & Spreadsheet Tools ==========================
+// ======= HTML Service Entrypoint =======
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('PDF and Spreadsheet Tools')
+    .setWidth(600)
+    .setHeight(400)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+}
 
+// =======================================================
+// ====== GLOBAL CONSTANTS & CONFIGURATION ======
+// =======================================================
 
-// ======= Constants =======
+// --- General Folder IDs ---
 const TRADING_PARTNER_DESTINATION_ID = '1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY'; // Destination for copied trading partner PDFs
 const SHIPPING_LABEL_DESTINATION_ID = '1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN'; // Destination for copied shipping label PDFs
 const SHIPPING_MANIFEST_DESTINATION_ID = '11jxPplN9wGBIrtkyxUXo5tpaRaTzWX0a'; // Destination for copied shipping manifest PDFs
-const DDPOS_FOLDER_ID = '1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp'; // Replace with DDPOS folder ID
-const DIG_DEFENCE_FOLDER_ID = '1YScXpnNqJSjWM4tdxna95YqI0D9hzknJ';
+const DDPOS_FOLDER_ID = '1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp';                 // DDPOS folder ID (Used by renameDDPOSFiles, may also be PO destination for splitter)
+const DIG_DEFENCE_FOLDER_ID = '1YScXpnNqJSjWM4tdxna95YqI0D9hzknJ';           // Dig Defence folder ID (Usage not clear from provided functions)
 
 
 
-// Trading Partner Folders and Filenames
+// --- Trading Partner Source Folders ---
 const tradingPartners = [
   { id: "1ovwLcs_YV2lSjFaYHBPMHo8PIW-_MlnK", filename: "document-PS-amazon" },
   { id: "1Q-jruIpq7B8QtE6yK5Lk0Ti0sSt0V5lD", filename: "document-PS-chewy" },
@@ -31,7 +41,7 @@ const tradingPartners = [
   { id: "1yzEmFqG-T50m1sao1-f0rzGzH5sXGwc6", filename: "document-PS-wcs" }
 ];
 
-// Shipping Label Folders and Filenames
+// --- Shipping Label Source Folders ---
 const shippingLabelPartners = [
   { id: "1XQPZM7A6X_qBzbmDvYp7NTm5YbQj57Nu", filename: "document-PS-amazon-L" },
   { id: "16Cx9vAtcc9nTDp4VqUnx2Dh-U_m1gIzO", filename: "document-PS-chewy-L" },
@@ -52,7 +62,7 @@ const shippingLabelPartners = [
   { id: "1w1aZYMf5BhSvZhMOmPIQJJH9PrfBkBfy", filename: "document-PS-wcs-L" }
 ];
 
-// Shipping Manifest Folders and Filenames
+// --- Shipping Manifest Source Folders ---
 const shippingManifestPartners = [
   { id: "1BfAbKRGq8qIGT7IznZDS9numy_zx2ELe", filename: "document-PS-amazon-T" },
   { id: "1R7_m9ikTPYQVpf3ZGrsyC5roDtSEWbLN", filename: "document-PS-chewy-T" },
@@ -72,6 +82,91 @@ const shippingManifestPartners = [
   { id: "15PT6-0zVn9-y_SZs3WeZySK2B11kPE7p", filename: "document-PS-wf-T" },
   { id: "1kiVrEXnrOluFepxdcPGAC4xSNa9Wbc9L", filename: "document-PS-wcs-T" }
 ];
+
+// -------------------------------------------
+// --- Configuration for PDF Splitting (sosSplit function) ---
+// -------------------------------------------
+const PROJECT_KEY = 'project_public_37a5967de1bae9e416b749063108be66_0wJhvdcca3bb4abecc4f04066775304a80871'; // iLovePDF Project Key
+const SECRET_KEY = 'secret_key_4615bfe73bc5142a6cf155654b86d8c4_6kH-_6f48cce83a8bb20792b68acaffa3dae1';   // iLovePDF Secret Key
+const SOURCE_FOLDER_URL_FOR_SPLITTING = 'https://drive.google.com/drive/folders/1iw82vvO3jupkbSCC98zInvAFm7_tkIUy'; // Folder to scan for files to split (e.g., Lowes)
+const DEST_FOLDER_URL_FOR_SOS = 'https://drive.google.com/drive/folders/148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK';       // Folder to save SOS labels
+const DELETE_ORIGINAL_AFTER_SPLIT = true;           // Delete original after successful split? (true/false)
+const PO_KEYWORD = "PO Number:";                    // Keyword to identify PO pages
+const SOS_KEYWORD = "SOS";                          // Keyword to identify SOS pages
+
+
+// Generate JWT for iLovePDF operations
+function generateILovePDFJwt_() {
+  const header = { alg: "HS256", typ: "JWT" };
+  const payload = { // optional payload for task creation
+    exp: Math.floor(Date.now() / 1000) + 60*60, // 1 hour expiry
+  };
+  const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(header));
+  const encodedPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
+  const signature = Utilities.computeHmacSha256Signature(encodedHeader + "." + encodedPayload, SECRET_KEY);
+  const encodedSignature = Utilities.base64EncodeWebSafe(signature);
+  return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
+}
+
+
+// Optional: Folder to save POs if you DON'T want them saved back to the source folder.
+// const DEST_FOLDER_URL_FOR_POS = 'https://drive.google.com/drive/folders/1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp'; // DDPOS folder - only needed if sosSplit saves POs here
+
+
+// -------------------------------------------
+// --- Configuration for Reporting (emailPageCountReport function) ---
+// -------------------------------------------
+const REPORT_EMAIL_ADDRESS = "joe@digdefence.com";  // Email address for reports
+
+// Map PO filenames to friendly names for the report
+const poPartnerNameMap = {
+  "document-PS-amazon": "Amazon",
+  "document-PS-chewy": "Chewy",
+  "document-PS-dd": "Dig Defence",
+  "document-PS-homedepot": "Home Depot",
+  "document-PS-lowes": "Lowes",
+  "document-PS-menards": "Menards",
+  "document-PS-misc": "Misc",
+  "document-PS-petco": "Petco",
+  "document-PS-sams": "Sams",
+  "document-PS-sample": "Sample",
+  "document-PS-shein": "Shein",
+  "document-PS-temu": "Temu",
+  "document-PS-tiktok": "TikTok",
+  "document-PS-tsc": "TSC",
+  "document-PS-walmart": "Wal-Mart",
+  "document-PS-wf": "Wayfair",
+  "document-PS-wcs": "WCS"
+};
+
+// Map Label filenames to friendly names for the report
+const labelPartnerNameMap = {
+  "document-PS-amazon-L": "Amazon",
+  "document-PS-chewy-L": "Chewy",
+  "document-PS-dd-L": "Dig Defence",
+  "document-PS-homedepot-L": "Home Depot",
+  "document-PS-lowes-L": "Lowes",
+  "document-PS-menards-L": "Menards",
+  "document-PS-misc-L": "Misc",
+  "document-PS-petco-L": "Petco",
+  "document-PS-sams-L": "Sams",
+  "document-PS-sample-L": "Sample",
+  "document-PS-shein-L": "Shein",
+  "document-PS-temu-L": "Temu",
+  "document-PS-tiktok-L": "TikTok",
+  "document-PS-tsc-L": "TSC",
+  "document-PS-walmart-L": "Wal-Mart",
+  "document-PS-wf-L": "Wayfair",
+  "document-PS-wcs-L": "WCS"
+};
+
+// =======================================================
+// ====== END OF CONFIGURATION ======
+// =======================================================
+
+// (Your original functions like renameTradingPartnerFiles, etc., should start below here)
+
+
 
 // ======= Trading Partner PDF Renaming =======
 function renameTradingPartnerFiles() {
@@ -244,30 +339,6 @@ function renameShippingManifestPDFs() {
   return `✅ Renamed ${totalFiles} shipping manifest PDFs`;
 }
 
-// ======= DDPOS Files Renaming =======
-function renameDDPOSFiles() {
-  try {
-    const folder = DriveApp.getFolderById(DDPOS_FOLDER_ID);
-    const files = folder.getFilesByType(MimeType.PDF);
-    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
-    let index = 1;
-    let totalFiles = 0;
-
-    while (files.hasNext()) {
-      const file = files.next();
-      const newName = `${today}-ddpos${index > 1 ? `-${index}` : ''}.pdf`;
-      file.setName(newName);
-      index++;
-      totalFiles++;
-    }
-
-    Logger.log(`Renamed ${totalFiles} DDPOS files`);
-    return `✅ Renamed ${totalFiles} DDPOS PDFs to ${today}-ddpos*.pdf`;
-  } catch (e) {
-    Logger.log(`Error renaming DDPOS files: ${e.message}`);
-    return `⚠️ Failed to rename DDPOS PDFs: ${e.message}`;
-  }
-}
 // ======= Rename File Ext =======
 function renameFileToPDF() {
   // Collect all relevant folder IDs
@@ -399,10 +470,10 @@ function copyShippingManifestPDFs() {
 }
 
 // ======= Moving Shipping Docs =======
-function prepareShippingDocuments() {
+function moveShippingDocuments() {
   try {
     const SOURCE_FOLDERS = [
-      "1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp", // Final PO PDF Folder
+      "1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY", // All Combined Packing Slips Folder
       "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"  // All Combined Labels Folder
     ];
     const DESTINATION_FOLDER_ID = "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK";
@@ -428,68 +499,16 @@ function prepareShippingDocuments() {
   }
 }
 
-// ======= Email Prep =======
-function emailPrep() {
-  try {
-    // === Folder IDs ===
-    const sourceFolders = [
-      "1KKU7TUn3NrUSGVqKd-lZIpEMWwGQxOOY", // All Combined Packing Slips Folder
-      "1YVqcBeCd3aasg-cSxSBLzxqb85sUZcuN"  // All Combined Labels Folder
-    ];
-
-    const destinationFolders = [
-      "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK", // PO Production Folder
-      "16L13SDR6_bCFs_r6trB74GNnL4GwfxY-"  // 1st Previous Day Folder, adds a copy for backup
-    ];
-
-    let totalCopied = 0;
-
-    // === Iterate over source folders ===
-    sourceFolders.forEach(sourceId => {
-      const sourceFolder = DriveApp.getFolderById(sourceId);
-      const files = sourceFolder.getFilesByType(MimeType.PDF);
-
-      // For each file, copy to each destination
-      while (files.hasNext()) {
-        const file = files.next();
-
-        destinationFolders.forEach(destId => {
-          const destFolder = DriveApp.getFolderById(destId);
-
-          // If a file with the same name exists, remove it first
-          const existingFiles = destFolder.getFilesByName(file.getName());
-          while (existingFiles.hasNext()) {
-            existingFiles.next().setTrashed(true);
-          }
-
-          // Copy the file
-          file.makeCopy(file.getName(), destFolder);
-          totalCopied++;
-        });
-      }
-    });
-
-    const msg = `✅ Copied ${totalCopied} PDF(s) to both destination folders.`;
-    Logger.log(msg);
-    return msg;
-
-  } catch (e) {
-    const errMsg = `⚠️ emailPrep() failed: ${e.message}`;
-    Logger.log(errMsg);
-    return errMsg;
-  }
-}
-
 // ======= Purge All PDFs =======
 function purgeAllPDFs() {
   const allFolderIds = new Set([
     ...tradingPartners.map(p => p.id),
     ...shippingLabelPartners.map(p => p.id),
     ...shippingManifestPartners.map(p => p.id),
-    DDPOS_FOLDER_ID,
-    TRADING_PARTNER_DESTINATION_ID,
-    SHIPPING_LABEL_DESTINATION_ID,
-    SHIPPING_MANIFEST_DESTINATION_ID
+    DDPOS_FOLDER_ID,              // Final PO PDF Folder
+    TRADING_PARTNER_DESTINATION_ID,   // All Combined Packing Slip Folder
+    SHIPPING_LABEL_DESTINATION_ID,    // All Combined Shipping Label Folder
+    SHIPPING_MANIFEST_DESTINATION_ID  // All Combined Manifests Folder
   ]);
 
   let totalDeleted = 0;
@@ -706,7 +725,7 @@ function parseShipToBlock_(text) {
 /**
  * Parses all line items from the OCR text.
  * @param {string} text The full text content from the PDF.
- * @return {Array<Object>} A list of item objects, each with vendorSku, internalSku, quantity, and weight.
+ *To * @return {Array<Object>} A list of item objects, each with vendorSku, internalSku, quantity, and weight.
  * @private
  */
 function parseLineItems_(text) {
@@ -900,17 +919,686 @@ function parseWCSLineItems_(text) {
   return items;
 }
 
+// =======================================================
+// ====== REPORTING FUNCTION (Native Parsing - BOLD TITLES) ======
+// =======================================================
+
+/**
+ * Scans all partner folders (both POs and Labels), calculates totals using
+ * native Apps Script PDF parsing, and emails a report with bold titles.
+ */
+function emailPageCountReport() {
+  Logger.log('Starting Page & Package Count Report function (Native Parsing)...');
+  
+  // --- Configuration Checks ---
+  // Ensure required constants are defined
+  if (typeof REPORT_EMAIL_ADDRESS === 'undefined' || !REPORT_EMAIL_ADDRESS || REPORT_EMAIL_ADDRESS === 'your-email@example.com') {
+      Logger.log('ERROR: REPORT_EMAIL_ADDRESS is not defined or is placeholder.'); return; }
+  if (typeof poPartnerNameMap === 'undefined' || typeof labelPartnerNameMap === 'undefined' ) {
+      Logger.log('ERROR: poPartnerNameMap or labelPartnerNameMap is not defined.'); return; }
+   if (typeof tradingPartners === 'undefined' || typeof shippingLabelPartners === 'undefined' ) {
+      Logger.log('ERROR: tradingPartners or shippingLabelPartners array is not defined.'); return; }
+  // --- End Checks ---
+
+  let poReportData = {};
+  let packageReportData = {};
+  let grandTotalPageCount = 0;
+  let grandTotalPackageCount = 0;
+
+  // --- Helper function to get page count ---
+// --- Helper function to get page count ---
+  function getNativePageCount(file) {
+    let filePageCount = 0;
+    try {
+      const blob = file.getBlob();
+      // Use 'ISO-8859-1' to read the binary data as text without corrupting it
+      const content = blob.getDataAsString('ISO-8859-1'); 
+
+      // --- NEW STRATEGY ---
+      // Instead of looking for "/Pages /Count [number]", we will
+      // count every instance of "/Type /Page" (which defines a single page).
+      // This is far more reliable across different PDF structures.
+      const pageRegex = /\/Type\s*\/Page\b/g;
+      const matches = content.match(pageRegex);
+
+      if (matches && matches.length > 0) {
+        filePageCount = matches.length;
+      } else {
+        // --- FALLBACK STRATEGY ---
+        // If for some reason we find 0 /Page tags, we'll try the old
+        // method one last time. This is just a safety net.
+        Logger.log(`Warning: Could not find any /Type /Page definitions in: ${file.getName()}. Trying /Pages /Count method...`);
+        
+        const countRegex = /\/Type\s*\/Pages[\s\S]*?\/Count\s+(\d+)/;
+        const countMatch = content.match(countRegex);
+        
+        if (countMatch && countMatch[1]) {
+          filePageCount = parseInt(countMatch[1], 10);
+          Logger.log(`--> Fallback succeeded. Found /Pages /Count of: ${filePageCount}`);
+        } else {
+          Logger.log(`--> ERROR: All parsing methods failed for ${file.getName()}. Returning 0.`);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error natively processing file ${file.getName()}: ${e.message}`);
+      if (e.message.includes("exceeded maximum execution time")) {
+         Logger.log(`--> File ${file.getName()} might be too large for native text extraction.`);
+      }
+    }
+    return filePageCount;
+  }
+  // --- End Helper ---
+  // --- End Helper ---
+
+  try {
+    // Initialize report data
+    for (const key in poPartnerNameMap) {
+      poReportData[poPartnerNameMap[key]] = 0;
+    }
+    for (const key in labelPartnerNameMap) {
+      packageReportData[labelPartnerNameMap[key]] = 0;
+    }
+
+    // === Step 1: Loop through all ORIGINAL PO folders ===
+    Logger.log('Scanning ORIGINAL PO folders...');
+    for (const partner of tradingPartners) {
+      const partnerName = poPartnerNameMap[partner.filename];
+      if (!partnerName) {
+        Logger.log(`Skipping unknown PO partner: ${partner.filename}`);
+        continue;
+      }
+
+      try { 
+        const sourceFolder = DriveApp.getFolderById(partner.id);
+        const files = sourceFolder.getFilesByType(MimeType.PDF);
+        let partnerTotalPages = 0;
+
+        while (files.hasNext()) {
+          const file = files.next();
+          // Skip any leftover -SOS files in PO folders 
+          if (!file.getName().toUpperCase().includes('-SOS')) {
+             partnerTotalPages += getNativePageCount(file); 
+          }
+        } 
+        
+        poReportData[partnerName] += partnerTotalPages; 
+        grandTotalPageCount += partnerTotalPages;
+        Logger.log(`- ${partnerName} Original PO Pages: ${partnerTotalPages}`);
+      } catch (folderError) {
+         Logger.log(`Error accessing original PO folder for ${partnerName} (ID: ${partner.id}): ${folderError.message}`);
+      }
+    } 
+    Logger.log('Original PO scanning complete.');
+
+    // === Step 1.5: Loop through the DDPOS folder (split POs) ===
+    Logger.log('Scanning DDPOS folder for split POs...');
+    // Check if the variable is defined and not a placeholder
+    if (typeof DEST_FOLDER_URL_FOR_POS !== 'undefined' && DEST_FOLDER_URL_FOR_POS && DEST_FOLDER_URL_FOR_POS !== 'YOUR_PO_DESTINATION_FOLDER_URL') {
+        try {
+            const ddposFolderId = DEST_FOLDER_URL_FOR_POS.split('/').pop(); 
+            const ddposFolder = DriveApp.getFolderById(ddposFolderId);
+            const ddposFiles = ddposFolder.getFilesByType(MimeType.PDF);
+            let ddposTotalPages = 0;
+
+            while (ddposFiles.hasNext()) {
+                const file = ddposFiles.next();
+                const fileName = file.getName();
+                if (fileName.toUpperCase().includes('-SOS')) continue; 
+                
+                let partnerFound = false;
+                for (const partnerFilename in poPartnerNameMap) {
+                    if (fileName.startsWith(partnerFilename)) { 
+                        const partnerName = poPartnerNameMap[partnerFilename];
+                        const filePageCount = getNativePageCount(file);
+                        
+                        if (poReportData.hasOwnProperty(partnerName)) {
+                           poReportData[partnerName] += filePageCount; 
+                           grandTotalPageCount += filePageCount; 
+                           ddposTotalPages += filePageCount;
+                           Logger.log(`- Found split PO for ${partnerName}: ${fileName} (${filePageCount} pages)`);
+                           partnerFound = true;
+                           break; 
+                        } else {
+                           Logger.log(`- Matched file ${fileName} to partner ${partnerName}, but partner not in report map.`);
+                        }
+                    }
+                }
+                if (!partnerFound) {
+                    Logger.log(`- Found file in DDPOS, but couldn't match to partner: ${fileName}`);
+                }
+            }
+             Logger.log(`DDPOS scanning complete. Found ${ddposTotalPages} pages in split POs.`);
+        } catch (e) {
+            Logger.log(`Error scanning DDPOS folder (URL: ${DEST_FOLDER_URL_FOR_POS}): ${e.message}`);
+        }
+    } else {
+       Logger.log('Skipping DDPOS scan: DEST_FOLDER_URL_FOR_POS variable is not configured or is placeholder.');
+    }
 
 
+    // === Step 2: Loop through all Label folders ===
+    Logger.log('Scanning Label folders...');
+     for (const partner of shippingLabelPartners) {
+      const partnerName = labelPartnerNameMap[partner.filename];
+      if (!partnerName) {
+        Logger.log(`Skipping unknown Label partner: ${partner.filename}`);
+        continue;
+      }
+      try { 
+        const sourceFolder = DriveApp.getFolderById(partner.id);
+        const files = sourceFolder.getFilesByType(MimeType.PDF);
+        let partnerTotalPages = 0;
+        
+        while (files.hasNext()) {
+          const file = files.next();
+          partnerTotalPages += getNativePageCount(file); 
+        } 
+        
+        packageReportData[partnerName] = partnerTotalPages; 
+        grandTotalPackageCount += partnerTotalPages;
+        Logger.log(`- ${partnerName} Label Pages: ${partnerTotalPages}`);
+      } catch (folderError) {
+          Logger.log(`Error accessing Label folder for ${partnerName} (ID: ${partner.id}): ${folderError.message}`);
+      }
+    } 
+    Logger.log(`Label scanning complete. Total Label Pages: ${grandTotalPackageCount}`);
 
+    // === Step 3: Build and Send the Email (as HTML) ===
+    Logger.log('All folders scanned. Building and sending HTML email report...');
+    
+    const today = new Date().toLocaleDateString('en-US');
+    const emailSubject = `Daily PO Pack Count - ${today}`;
 
+    // Build the email body as an HTML string
+    // Using <pre> tags helps preserve spacing similar to the plain text version
+    const emailBodyHtml = `
+      
+      <b>OVERALL TOTALS</b><br>
+      POs: ${grandTotalPageCount}<br>
+      Packs: ${grandTotalPackageCount}<br>
+      <br>
+      <b>OUTLET PO COUNT</b><br>
+      Amazon: ${poReportData['Amazon'] || 0}<br>
+      Chewy: ${poReportData['Chewy'] || 0}<br>
+      Dig Defence: ${poReportData['Dig Defence'] || 0}<br>
+      Home Depot: ${poReportData['Home Depot'] || 0}<br>
+      Lowes: ${poReportData['Lowes'] || 0}<br>
+      Menards: ${poReportData['Menards'] || 0}<br>
+      Misc: ${poReportData['Misc'] || 0}<br>
+      Petco: ${poReportData['Petco'] || 0}<br>
+      Sams: ${poReportData['Sams'] || 0}<br>
+      Shein: ${poReportData['Shein'] || 0}<br>
+      Temu: ${poReportData['Temu'] || 0}<br>
+      TSC: ${poReportData['TSC'] || 0}<br>
+      Wal-Mart: ${poReportData['Wal-Mart'] || 0}<br>
+      WCS: ${poReportData['WCS'] || 0}<br>
+      Wayfair: ${poReportData['Wayfair'] || 0}<br>
+      <br>
+      <b>OUTLET PACKAGE COUNT</b><br>
+      Amazon: ${packageReportData['Amazon'] || 0}<br>
+      Chewy: ${packageReportData['Chewy'] || 0}<br>
+      Dig Defence: ${packageReportData['Dig Defence'] || 0}<br>
+      Home Depot: ${packageReportData['Home Depot'] || 0}<br>
+      Lowes: ${packageReportData['Lowes'] || 0}<br>
+      Menards: ${packageReportData['Menards'] || 0}<br>
+      Misc: ${packageReportData['Misc'] || 0}<br>
+      Petco: ${packageReportData['Petco'] || 0}<br>
+      Sams: ${packageReportData['Sams'] || 0}<br>
+      Shein: ${packageReportData['Shein'] || 0}<br>
+      Temu: ${packageReportData['Temu'] || 0}<br>
+      TSC: ${packageReportData['TSC'] || 0}<br>
+      Wal-Mart: ${packageReportData['Wal-Mart'] || 0}<br>
+      WCS: ${packageReportData['WCS'] || 0}<br>
+      Wayfair: ${packageReportData['Wayfair'] || 0}<br>
+    `;
 
+    // Send the email using the 'htmlBody' option
+    MailApp.sendEmail({
+      to: REPORT_EMAIL_ADDRESS,
+      subject: emailSubject,
+      htmlBody: emailBodyHtml // Use htmlBody instead of body
+    });
 
-// ======= HTML Service Entrypoint =======
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
-    .setTitle('PDF and Spreadsheet Tools')
-    .setWidth(600)
-    .setHeight(400)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    Logger.log(`Report successfully sent to ${REPORT_EMAIL_ADDRESS}`);
+
+  } catch (e) {
+    Logger.log(`An error occurred in emailPageCountReport: ${e.toString()}`);
+    try {
+       // Send error email as plain text for simplicity
+       MailApp.sendEmail({
+        to: REPORT_EMAIL_ADDRESS,
+        subject: `PDF Report FAILED - ${new Date().toLocaleDateString('en-US')}`,
+        body: `The automated PDF report failed to run.\n\nError: ${e.toString()}`
+      });
+    } catch (mailError) {
+      Logger.log(`Failed to send error email: ${mailError.toString()}`);
+    }
+  }
 }
+
+// =======================================================
+// =============== Manifest Merging Function =============
+// =======================================================
+
+// =======================================================
+// ====== PDF MERGING FUNCTION & HELPERS (iLovePDF ONLY) ======
+// =======================================================
+
+/**
+ * FUNCTION: Merge PDFs using iLovePDF API
+ * Merges all PDFs from a source folder into one file in a destination folder.
+ */
+function mergeManifests() {
+  // --- Define Source, Destination, and Output Name ---
+  const sourceFolderUrl = 'https://drive.google.com/drive/folders/11jxPplN9wGBIrtkyxUXo5tpaRaTzWX0a';
+  const destFolderUrl = 'https://drive.google.com/drive/folders/148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK';
+  const outputFileName = 'document-PS-manifest.pdf'; // Desired output filename
+  // --- End Definitions ---
+
+  Logger.log(`Starting PDF Merge function for: ${outputFileName}`);
+
+  // --- Configuration Checks ---
+  if (typeof PROJECT_KEY === 'undefined' || !PROJECT_KEY || PROJECT_KEY === 'YOUR_PROJECT_KEY' || 
+      typeof SECRET_KEY === 'undefined' || !SECRET_KEY || SECRET_KEY === 'YOUR_SECRET_KEY') {
+     Logger.log('ERROR: iLovePDF PROJECT_KEY/SECRET_KEY missing or not set.'); return; 
+  }
+   if (!sourceFolderUrl || !destFolderUrl || !outputFileName) {
+       Logger.log('ERROR: Source folder, Destination folder, or Output filename is missing in the function.'); return;
+   }
+  // --- End Checks ---
+
+  let sourceFolder, destFolder;
+   try {
+      sourceFolder = DriveApp.getFolderById(sourceFolderUrl.split('/').pop());
+      destFolder = DriveApp.getFolderById(destFolderUrl.split('/').pop());
+  } catch (folderError) {
+      Logger.log(`ERROR: Could not access source or destination folder. Check IDs. Details: ${folderError.message}`); return; }
+
+  const files = sourceFolder.getFilesByType(MimeType.PDF);
+  if (!files.hasNext()) { Logger.log('No PDF files found in the source folder to merge.'); return; }
+  
+  try {
+    const authToken = getIloveApiToken_(); // Get auth token
+    const headers = { 'Authorization': 'Bearer ' + authToken };
+
+    // === Step 1: Start Merge Task ===
+    Logger.log('Starting merge task...');
+    const startResponse = UrlFetchApp.fetch('https://api.ilovepdf.com/v1/start/merge', {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (startResponse.getResponseCode() !== 200) throw new Error(`Merge Start failed: ${startResponse.getContentText()}`);
+    const startData = JSON.parse(startResponse.getContentText());
+    const server = `https://${startData.server}`;
+    const taskId = startData.task;
+    Logger.log(`Task started with ID: ${taskId}`);
+
+    // === Step 2: Upload Files ===
+    const uploadedFiles = []; // Array to store server filenames for processing
+    while (files.hasNext()) {
+      const file = files.next();
+      Logger.log(`Uploading file: ${file.getName()}...`);
+      const uploadResponse = UrlFetchApp.fetch(`${server}/v1/upload`, {
+        method: 'post',
+        headers: headers,
+        payload: { task: taskId, file: file.getBlob() },
+        muteHttpExceptions: true
+      });
+      if (uploadResponse.getResponseCode() !== 200) throw new Error(`Upload failed for ${file.getName()}: ${uploadResponse.getContentText()}`);
+      const uploadData = JSON.parse(uploadResponse.getContentText());
+      // Add server filename and original filename to the list for the process step
+      uploadedFiles.push({ server_filename: uploadData.server_filename, filename: file.getName() }); 
+      Logger.log(`Upload successful for ${file.getName()}`);
+    }
+
+    // === Step 3: Process the Merge Task ===
+    Logger.log(`Processing the merge for ${uploadedFiles.length} files...`);
+    const processPayload = {
+        task: taskId,
+        tool: 'merge',
+        files: uploadedFiles // Send the list of files to merge (order is determined by upload order here)
+    };
+
+    const processResponse = UrlFetchApp.fetch(`${server}/v1/process`, {
+      method: 'post',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(processPayload),
+      muteHttpExceptions: true
+    });
+     if (processResponse.getResponseCode() !== 200) {
+       let errorDetail = processResponse.getContentText();
+       try { const errorJson = JSON.parse(errorDetail); if (errorJson && errorJson.error && errorJson.error.message) { errorDetail = errorJson.error.message; } } catch(parseError) {}
+       throw new Error(`Merge Process failed (Status ${processResponse.getResponseCode()}): ${errorDetail}`);
+     }
+    Logger.log(`Processing successful: ${processResponse.getContentText()}`);
+    
+    // === Step 4: Download the Result ===
+    Logger.log('Downloading the final merged PDF...');
+    const downloadResponse = UrlFetchApp.fetch(`${server}/v1/download/${taskId}`, {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true 
+    });
+
+    if (downloadResponse.getResponseCode() !== 200) {
+        throw new Error(`Download failed with status ${downloadResponse.getResponseCode()}: ${downloadResponse.getContentText()}`);
+    }
+    
+    const mergedPdfBlob = downloadResponse.getBlob().setName(outputFileName); // Set the desired name
+    
+    // === Step 5: Save to Google Drive ===
+    const finalFile = destFolder.createFile(mergedPdfBlob);
+    Logger.log(`SUCCESS! File "${outputFileName}" saved to destination folder: ${finalFile.getUrl()}`);
+
+  } catch (e) {
+    Logger.log(`An error occurred during merge: ${e.toString()}`);
+     if (e.stack) { Logger.log(`Stack Trace: ${e.stack}`); }
+  }
+}
+// =======================================================
+// ====== Shipping Doc Merging Software Function ======
+//
+// This function merges all packing slips and renames 
+// to today's date and moves the loose packing slip to 
+// the archive folder.
+// =======================================================
+/**
+ * Merges shipping PDFs, saves the result with a dynamic name,
+ * and then moves the processed source files to an archive folder.
+ */
+function prepareShippingDocs() {
+  // --- Define Source, Destination, and Archive ---
+  const sourceFolderUrl = 'https://drive.google.com/drive/folders/148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK';
+  const destFolderUrl = 'https://drive.google.com/drive/folders/148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK';
+  
+  // Updated archive folder URL
+  const archiveFolderUrl = 'https://drive.google.com/drive/folders/16L13SDR6_bCFs_r6trB74GNnL4GwfxY-'; 
+  
+  // --- Base name for output file ---
+  const outputBaseName = 'ddpos';
+  // --- End Definitions ---
+
+  // --- Configuration Checks ---
+  if (typeof PROJECT_KEY === 'undefined' || !PROJECT_KEY || PROJECT_KEY === 'YOUR_PROJECT_KEY' ||
+    typeof SECRET_KEY === 'undefined' || !SECRET_KEY || SECRET_KEY === 'YOUR_SECRET_KEY') {
+    Logger.log('ERROR: iLovePDF PROJECT_KEY/SECRET_KEY missing or not set.');
+    return;
+  }
+  if (!sourceFolderUrl || !destFolderUrl || !outputBaseName || !archiveFolderUrl) {
+    Logger.log('ERROR: Source, Destination, Archive folder, or Output basename is missing.');
+    return;
+  }
+  // --- End Checks ---
+
+  let sourceFolder, destFolder, archiveFolder;
+  try {
+    sourceFolder = DriveApp.getFolderById(sourceFolderUrl.split('/').pop());
+    destFolder = DriveApp.getFolderById(destFolderUrl.split('/').pop());
+    archiveFolder = DriveApp.getFolderById(archiveFolderUrl.split('/').pop()); // Get archive folder
+  } catch (folderError) {
+    Logger.log(`ERROR: Could not access source, destination, or archive folder. Check IDs. Details: ${folderError.message}`);
+    return;
+  }
+
+  // --- Dynamic Filename Logic ---
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  let index = 1;
+  let outputFileName = `${today}-${outputBaseName}.pdf`; // Start with base name
+  while (destFolder.getFilesByName(outputFileName).hasNext()) {
+    index++;
+    outputFileName = `${today}-${outputBaseName}-${index}.pdf`;
+  }
+  Logger.log(`Starting PDF Merge. Output file will be: ${outputFileName}`);
+  
+  // Regex to skip previously merged files
+  const skipRegex = new RegExp(`^${today}-${outputBaseName}(-\\d+)?\\.pdf$`);
+  // --- End Dynamic Filename Logic ---
+
+  const files = sourceFolder.getFilesByType(MimeType.PDF);
+  if (!files.hasNext()) {
+    Logger.log('No PDF files found in the source folder to merge.');
+    return;
+  }
+
+  const filesToMove = []; // Array to hold files for archiving
+  
+  try {
+    const authToken = getIloveApiToken_(); 
+    const headers = { 'Authorization': 'Bearer ' + authToken };
+
+    // === Step 1: Start Merge Task ===
+    Logger.log('Starting merge task...');
+    const startResponse = UrlFetchApp.fetch('https://api.ilovepdf.com/v1/start/merge', {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (startResponse.getResponseCode() !== 200) throw new Error(`Merge Start failed: ${startResponse.getContentText()}`);
+    const startData = JSON.parse(startResponse.getContentText());
+    const server = `https://${startData.server}`;
+    const taskId = startData.task;
+    Logger.log(`Task started with ID: ${taskId}`);
+
+    // === Step 2: Upload Files (with filtering) ===
+    const uploadedFiles = []; 
+    while (files.hasNext()) {
+      const file = files.next();
+      const fileName = file.getName(); 
+
+      // --- Filter Logic ---
+      const skip1 = fileName.endsWith('-SOS.pdf');
+      const skip2 = fileName.endsWith('-L.pdf');
+      const skip3 = skipRegex.test(fileName); 
+      
+      if (skip1 || skip2 || skip3) {
+        Logger.log(`Skipping file (did not meet criteria): ${fileName}`);
+        continue; 
+      }
+      // --- End Filter Logic ---
+
+      Logger.log(`Uploading file: ${fileName}...`);
+      const uploadResponse = UrlFetchApp.fetch(`${server}/v1/upload`, {
+        method: 'post',
+        headers: headers,
+        payload: { task: taskId, file: file.getBlob() },
+        muteHttpExceptions: true
+      });
+      if (uploadResponse.getResponseCode() !== 200) throw new Error(`Upload failed for ${fileName}: ${uploadResponse.getContentText()}`);
+      
+      const uploadData = JSON.parse(uploadResponse.getContentText());
+      uploadedFiles.push({ server_filename: uploadData.server_filename, filename: file.getName() });
+      filesToMove.push(file); // Add file to the "move" list
+      Logger.log(`Upload successful for ${fileName}`);
+    }
+
+    // --- Check if any files were filtered ---
+    if (uploadedFiles.length === 0) {
+      Logger.log('No files in the source folder matched the filter criteria. Aborting merge.');
+      return;
+    }
+
+    // === Step 3: Process the Merge Task ===
+    Logger.log(`Processing the merge for ${uploadedFiles.length} files...`);
+    const processPayload = { task: taskId, tool: 'merge', files: uploadedFiles };
+    const processResponse = UrlFetchApp.fetch(`${server}/v1/process`, {
+      method: 'post',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(processPayload),
+      muteHttpExceptions: true
+    });
+    if (processResponse.getResponseCode() !== 200) {
+       let errorDetail = processResponse.getContentText();
+       try { const errorJson = JSON.parse(errorDetail); if (errorJson && errorJson.error && errorJson.error.message) { errorDetail = errorJson.error.message; } } catch(parseError) {}
+       throw new Error(`Merge Process failed (Status ${processResponse.getResponseCode()}): ${errorDetail}`);
+    }
+    Logger.log(`Processing successful: ${processResponse.getContentText()}`);
+
+    // === Step 4: Download the Result ===
+    Logger.log('Downloading the final merged PDF...');
+    const downloadResponse = UrlFetchApp.fetch(`${server}/v1/download/${taskId}`, {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (downloadResponse.getResponseCode() !== 200) {
+       throw new Error(`Download failed with status ${downloadResponse.getResponseCode()}: ${downloadResponse.getContentText()}`);
+    }
+    
+    const mergedPdfBlob = downloadResponse.getBlob().setName(outputFileName); 
+
+    // === Step 5: Save to Google Drive ===
+    const finalFile = destFolder.createFile(mergedPdfBlob);
+    Logger.log(`SUCCESS! File "${outputFileName}" saved to destination folder: ${finalFile.getUrl()}`);
+    
+    // === Step 6: Move Processed Files to Archive ===
+    Logger.log(`Moving ${filesToMove.length} processed files to archive...`);
+    let moveErrors = 0;
+    
+    for (const fileToMove of filesToMove) {
+      try {
+        // Move the file to the archive folder specified at the top
+        fileToMove.moveTo(archiveFolder);
+        Logger.log(`Moved: ${fileToMove.getName()}`);
+      } catch (moveError) {
+        // Log an error but continue the loop
+        Logger.log(`ERROR: Failed to move file: ${fileToMove.getName()}. Error: ${moveError.message}`);
+        moveErrors++;
+      }
+    }
+    
+    if (moveErrors > 0) {
+      Logger.log(`Warning: ${moveErrors} files could not be moved to the archive.`);
+    } else {
+      Logger.log('All processed files moved to archive successfully.');
+    }
+
+  } catch (e) {
+    Logger.log(`An error occurred during merge: ${e.toString()}`);
+    if (e.stack) { Logger.log(`Stack Trace: ${e.stack}`); }
+  }
+}
+// =======================================================
+// ==== Ending Shipping Doc Merging Software Function ====
+// =======================================================
+
+
+
+// =======================================================
+// ====== HELPER FUNCTIONS for iLovePDF Merging ======
+// =======================================================
+
+/**
+ * Gets a fresh iLovePDF API token. 
+ * (Ensure this function only exists once in your script)
+ */
+function getIloveApiToken_() {
+  // Ensure PROJECT_KEY and SECRET_KEY are defined
+  if (typeof PROJECT_KEY === 'undefined' || typeof SECRET_KEY === 'undefined' || 
+      PROJECT_KEY === 'YOUR_PROJECT_KEY' || SECRET_KEY === 'YOUR_SECRET_KEY') {
+     throw new Error("PROJECT_KEY or SECRET_KEY is not defined in the Configuration section.");
+  }
+  
+  const authResponse = UrlFetchApp.fetch('https://api.ilovepdf.com/v1/auth', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ public_key: PROJECT_KEY, secret_key: SECRET_KEY }),
+    muteHttpExceptions: true 
+  });
+  
+  const responseCode = authResponse.getResponseCode();
+  const responseText = authResponse.getContentText();
+
+  if (responseCode !== 200) {
+    throw new Error(`iLovePDF Authentication failed. Status: ${responseCode}, Response: ${responseText}`);
+  }
+  
+  const token = JSON.parse(responseText).token;
+  if (!token) {
+     throw new Error(`iLovePDF Authentication succeeded but no token was returned. Response: ${responseText}`);
+  }
+  Logger.log('Successfully obtained iLovePDF Auth Token.'); 
+  return token;
+}
+
+/**
+ * Helper: Converts an array of page numbers [1, 2, 4, 5, 6, 8]
+ * into a range string "1-2,4-6,8" for the iLovePDF API.
+ * (Ensure this function only exists once in your script)
+ */
+function convertPageListToRangeString_(pageNumbers) {
+  if (!pageNumbers || pageNumbers.length === 0) { return ""; }
+  pageNumbers.sort((a, b) => a - b); 
+  let rangeString = "";
+  let startRange = pageNumbers[0];
+  for (let i = 0; i < pageNumbers.length; i++) {
+    if (i + 1 < pageNumbers.length && pageNumbers[i+1] === pageNumbers[i] + 1) { continue; } 
+    else {
+      if (rangeString.length > 0) rangeString += ","; 
+      if (pageNumbers[i] === startRange) { rangeString += startRange; } 
+      else { rangeString += `${startRange}-${pageNumbers[i]}`; }
+      if (i + 1 < pageNumbers.length) { startRange = pageNumbers[i+1]; }
+    }
+  }
+  return rangeString;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// =======================================================
+// ================= Add New Functions Below =============
+// =======================================================
