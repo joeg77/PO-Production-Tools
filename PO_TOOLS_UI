@@ -111,6 +111,62 @@
     @media (hover: none) {
       summary { padding: 25px; }
     }
+
+/* --- Custom Confirm Modal CSS --- */
+#confirmOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  display: none; /* Hidden by default */
+  align-items: center;
+  justify-content: center;
+}
+
+#confirmBox {
+  background: #1e1e1e;
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+  width: 90%;
+  max-width: 500px;
+}
+
+#confirmMessage {
+  font-size: 2.5rem; /* Large font */
+  color: #e0e0e0;
+  margin-bottom: 20px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+#confirmButtons {
+  display: flex;
+  justify-content: space-around;
+  gap: 15px;
+}
+
+#confirmButtons .remote-btn {
+   width: 45%; /* Buttons share the space */
+   margin-bottom: 0; /* Remove default margin */
+   font-size: 2.5rem; /* Match message */
+}
+
+/* Style the "No" button to be less prominent */
+#confirmBtnNo {
+  background: #555;
+}
+#confirmBtnNo:hover {
+  background: #666;
+}
+/* --- End Custom Modal CSS --- */
+
+
+
   </style>
 </head>
 <body>
@@ -122,7 +178,7 @@
       <div class="panel">
 
         <details>
-          <summary>Renaming</summary>
+          <summary>Daily File Renaming</summary>
           <div class="panel">
             <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFiles')">Rename Trading Partner Packing Slips</button>
             <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
@@ -133,7 +189,7 @@
         </details>
 
         <details>
-          <summary>Friday Operations</summary>
+          <summary>Friday File Renaming</summary>
           <div class="panel">
             <details>
               <summary>Renaming (-thurs)</summary>
@@ -147,7 +203,7 @@
         </details>
         
         <details>
-          <summary>Weekend Operations</summary>
+          <summary>Sunday File Renaming</summary>
           <div class="panel">
             <details>
               <summary>Renaming (-sun)</summary>
@@ -194,21 +250,123 @@
 
   <div id="toast"></div>
 
-  <script>
-    function showToast(message) {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.style.display = 'block';
-      setTimeout(() => { toast.style.display = 'none'; }, 3000);
-    }
+<script>
+    // --- NEW LINE ---
+    // This tells the script to wait until the HTML page is fully loaded
+    document.addEventListener('DOMContentLoaded', () => {
 
-    function runFunction(funcName) {
-      showToast(`Running ${funcName}...`);
-      google.script.run
-        .withSuccessHandler(result => showToast(result))
-        .withFailureHandler(error => showToast(`Error in ${funcName}: ${error.message}`))
-        [funcName]();
-    }
+      // --- Custom Confirm Modal Logic ---
+      // Now these are guaranteed to be found!
+      const confirmOverlay = document.getElementById('confirmOverlay');
+      const confirmMessageEl = document.getElementById('confirmMessage');
+      const confirmBtnYes = document.getElementById('confirmBtnYes');
+      const confirmBtnNo = document.getElementById('confirmBtnNo');
+
+      /**
+       * Shows a custom, styleable confirm dialog.
+       * @param {string} message The message to display.
+       * @returns {Promise<boolean>} Resolves true for "Yes", false for "No".
+       */
+      function customConfirm(message) {
+        confirmMessageEl.textContent = message;
+        confirmOverlay.style.display = 'flex';
+
+        return new Promise((resolve) => {
+          confirmBtnYes.addEventListener('click', () => {
+            confirmOverlay.style.display = 'none';
+            resolve(true); // User clicked "Yes"
+          }, { once: true });
+
+          confirmBtnNo.addEventListener('click', () => {
+            confirmOverlay.style.display = 'none';
+            resolve(false); // User clicked "No"
+          }, { once: true });
+        });
+      }
+      // --- End Custom Confirm ---
+
+
+      function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+      }
+
+      // Your custom toast messages
+      const toastMessages = {
+        'renameTradingPartnerFiles': 'Renaming Partner Slips...',
+        'renameShippingLabels': 'Renaming Shipping Labels...',
+        'renameShippingManifestPDFs': 'Renaming Manifests...',
+        'renameFileToPDF': 'Fixing file extensions...',
+        'renameTradingPartnerFilesThurs': 'Renaming Partner Slips (Thurs)...',
+        'renameShippingLabelsThurs': 'Renaming Labels (Thurs)...',
+        'renameShippingManifestPDFsThurs': 'Renaming Manifests (Thurs)...',
+        'renameTradingPartnerFilesSun': 'Renaming Partner Slips (Sun)...',
+        'renameShippingLabelsSun': 'Renaming Labels (Sun)...',
+        'renameShippingManifestPDFsSun': 'Renaming Manifests (Sun)...',
+        'copyTradingPartnerPDFs': 'Copying Partner Slips...',
+        'copyShippingLabelPDFs': 'Copying Shipping Labels...',
+        'copyShippingManifestPDFs': 'Copying Manifests...',
+        'emailPageCountReport': 'Generating Pack Count Report...',
+        'mergeManifests': 'Merging Manifests... 🖇️',
+        'moveShippingDocuments': 'Moving Docs to Email Folder...',
+        'prepareShippingDocs': 'Running Email Prep... 📧',
+        'purgeDailyShippingDocs': 'Purging Daily Docs... 🗑️',
+        'purgeAllPDFs': 'PURGING ALL PDFs... ⚠️'
+      };
+
+      // --- UPDATED runFunction ---
+      // We must attach this function to the global 'window' object
+      // so the 'onclick=""' in the HTML can find it inside the listener.
+      window.runFunction = async function(funcName) {
+        
+        if (funcName === 'purgeDailyShippingDocs' || funcName === 'purgeAllPDFs') {
+          
+          let confirmMessage = 'Are you sure?';
+          if (funcName === 'purgeDailyShippingDocs') {
+            confirmMessage = 'ARE YOU SURE you want to purge the Daily Shipping Doc Folder?';
+          } else if (funcName === 'purgeAllPDFs') {
+            confirmMessage = 'DANGER: ARE YOU SURE you want to purge ALL PDFs? This cannot be undone.';
+          }
+
+          const confirmed = await customConfirm(confirmMessage);
+          
+          if (!confirmed) {
+            showToast('Purge cancelled.');
+            return; 
+          }
+        }
+        
+        const defaultMessage = `Running ${funcName}...`;
+        const initialMessage = toastMessages[funcName] || defaultMessage;
+
+        showToast(initialMessage); 
+        
+        google.script.run
+          .withSuccessHandler(result => showToast(result)) 
+          .withFailureHandler(error => showToast(`Error in ${funcName}: ${error.message}`))
+          [funcName]();
+      }
+
+    // --- NEW LINE ---
+    // Closes the DOMContentLoaded listener
+    });
   </script>
+
+
+
+
+
+
+  <div id="confirmOverlay">
+  <div id="confirmBox">
+    <div id="confirmMessage"></div>
+    <div id="confirmButtons">
+      <button id="confirmBtnYes" class="remote-btn purge">Yes</button>
+      <button id="confirmBtnNo" class="remote-btn">No</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
