@@ -111,10 +111,27 @@ function extractMenardsShippingData() {
       const shipToData = parseShipToBlock_(text.content);
       const lineItems = parseLineItems_(text.content);
       if (lineItems.length === 0) throw new Error('No line items could be parsed from the PDF.');
-      for (const item of lineItems) {
-        const rowData = [poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,'STANDARD', item.weight, item.internalSku, poNumber, '', poNumber, item.quantity, 'N', '', shipToData.name, shipToData.name, 'menards'];
-        sheet.appendRow(rowData);
-      }
+      // --- In your extractMenardsShippingData function ---
+
+    // ...
+        for (const item of lineItems) {
+          
+          // --- BEFORE ---
+          // const rowData = [
+          //   poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
+          //   'STANDARD', item.weight, item.internalSku, poNumber, '', poNumber, item.quantity, 'N', '', shipToData.name, shipToData.name, 'menards'
+          // ];
+          
+          // --- AFTER ---
+          const rowData = [
+            poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
+            'STANDARD', item.weight, item.internalSku, poNumber, '', shipToData.storeNum, item.quantity, 'N', '', shipToData.name, shipToData.name, 'menards'
+          ];
+          // Note: The 16th value (Col P) was poNumber, now it's shipToData.storeNum
+
+          sheet.appendRow(rowData);
+        }
+    // ...
       processedCount++;
     } catch (e) {
       Logger.log(`Error processing ${file.getName()}: ${e.message}`);
@@ -190,13 +207,26 @@ function getOcrText_(file) {
 }
 
 function parseShipToBlock_(text) {
-  const data = { name: '', address: '', city: '', state: '', postal: '', phone: '' };
+  // 1. Added 'storeNum: '' ' to the data object
+  const data = { name: '', address: '', city: '', state: '', postal: '', phone: '', storeNum: '' };
+
+  // --- THIS IS THE UPDATED LINE ---
+  // It now looks for the number after "Bill To:"
+  const storeMatch = text.match(/Bill To:\s*(\d+)/i);
+  if (storeMatch && storeMatch[1]) {
+    data.storeNum = storeMatch[1].trim(); // e.g., "3268"
+  }
+  // ---------------------------------------------
+
   const match = text.match(/Ship To:\s*([\s\S]*?)(?=Guest Information:|Bill To:)/i);
+
   if (match && match[1]) {
     const lines = match[1].split('\n').map(line => line.trim()).filter(Boolean);
     const cszIndex = lines.findIndex(line => /,\s*[A-Z]{2}\s*\d{5}/.test(line));
     const phoneIndex = lines.findIndex(line => /Phone:/.test(line));
-    const nameLine = lines.find((line, index) => index !== cszIndex && index !== phoneIndex && /^[A-Z\s]+$/i.test(line) && !/^\d{4}$/.test(line));
+    const nameLine = lines.find((line, index) => {
+      return index !== cszIndex && index !== phoneIndex && /^[A-Z\s]+$/i.test(line) && !/^\d{4}$/.test(line);
+    });
     data.name = nameLine || '';
     if (cszIndex !== -1) {
       const cszMatch = lines[cszIndex].match(/(.+?),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
