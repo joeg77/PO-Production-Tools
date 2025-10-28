@@ -18,6 +18,17 @@ const SHIPPING_MANIFEST_DESTINATION_ID = '11jxPplN9wGBIrtkyxUXo5tpaRaTzWX0a'; //
 const DDPOS_FOLDER_ID = '1oQkpJRphGHCtDQEJPKMjOF2o43c8zUIp';                 // DDPOS folder ID (Used by renameDDPOSFiles, may also be PO destination for splitter)
 const DIG_DEFENCE_FOLDER_ID = '1YScXpnNqJSjWM4tdxna95YqI0D9hzknJ';           // Dig Defence folder ID (Usage not clear from provided functions)
 
+const MENARDS_SHIPPING_CONFIG = {
+  SHEET_ID: "18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY",
+  SHEET_NAME: "Sheet1",
+  FOLDER_ID: "1NH19Eiq_Kc5uAEmdijSkuNdYIJYClHCU",
+
+  // --- ADD THESE TWO LINES ---
+  LABEL_TEMPLATE_ID: "1ZA4oFHOzp4iF8fmKUBuCTHjF-AVXMjTl2oS3PMTIOvg",
+  LABEL_SAVE_FOLDER_ID: "1xCOFzeAhfPqBoYIum5WVca2kSB0wUL14"
+  // ... any other properties you have ...
+};
+
 
 
 // --- Trading Partner Source Folders ---
@@ -684,7 +695,17 @@ function getOcrText_(file) {
  * @private
  */
 function parseShipToBlock_(text) {
-  const data = { name: '', address: '', city: '', state: '', postal: '', phone: '' };
+  // 1. Added 'storeNum: '' ' to the data object
+  const data = { name: '', address: '', city: '', state: '', postal: '', phone: '', storeNum: '' };
+
+  // --- THIS IS THE UPDATED LINE ---
+  // It now looks for the number after "Bill To:"
+  const storeMatch = text.match(/Bill To:\s*(\d+)/i);
+  if (storeMatch && storeMatch[1]) {
+    data.storeNum = storeMatch[1].trim(); // e.g., "3268"
+  }
+  // ---------------------------------------------
+
   const match = text.match(/Ship To:\s*([\s\S]*?)(?=Guest Information:|Bill To:)/i);
 
   if (match && match[1]) {
@@ -721,7 +742,6 @@ function parseShipToBlock_(text) {
   }
   return data;
 }
-
 /**
  * Parses all line items from the OCR text.
  * @param {string} text The full text content from the PDF.
@@ -1546,59 +1566,104 @@ function convertPageListToRangeString_(pageNumbers) {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // =======================================================
-// ================= Add New Functions Below =============
+// ========== MENARDS GREEN LABEL CREATION   =============
 // =======================================================
+/**
+ * =============================================================
+ * FUNCTION 2: GENERATE LABELS
+ * =============================================================
+ * Reads the sheet and generates a 6x4 PDF label for each row.
+ */
+function generateMenardsGreenLabels() {
+  // 1. Get the data from the Google Sheet
+  const sheet = SpreadsheetApp.openById(MENARDS_SHIPPING_CONFIG.SHEET_ID).getSheetByName(MENARDS_SHIPPING_CONFIG.SHEET_NAME);
+  if (!sheet) {
+    Logger.log(`Error: Sheet tab named "${MENARDS_SHIPPING_CONFIG.SHEET_NAME}" not found.`);
+    return;
+  }
+  const data = sheet.getDataRange().getValues(); 
+
+  // 2. Get the template file and save folder
+  const templateFile = DriveApp.getFileById(MENARDS_SHIPPING_CONFIG.LABEL_TEMPLATE_ID);
+  const saveFolder = DriveApp.getFolderById(MENARDS_SHIPPING_CONFIG.LABEL_SAVE_FOLDER_ID);
+
+  // 3. Get headers to find column positions dynamically
+  const headers = data.shift(); // Removes the header row
+  const col = {
+    po: headers.indexOf('PKG_PACKAGE_ID'),
+    name: headers.indexOf('SHPTO_NAME'),
+    address: headers.indexOf('SHPTO_ADDRESS_1'),
+    city: headers.indexOf('SHPTO_CITY'),
+    state: headers.indexOf('SHPTO_STATE_PROV'),
+    postal: headers.indexOf('SHPTO_POSTAL_CODE'),
+    sku: headers.indexOf('PKG_CUSTOM1'), 
+    quantity: headers.indexOf('PKG_CUSTOM5'),
+    storeNum: headers.indexOf('PKG_CUSTOM4') }; 
+  
+
+  if (col.po === -1 || col.name === -1 || col.sku === -1) {
+    Logger.log("Error: Could not find required columns in sheet. Check names like 'PKG_PACKAGE_ID', 'SHPTO_NAME', 'PKG_CUSTOM1'.");
+    return;
+  }
+
+  // 4. Loop through each row of data
+  let generatedCount = 0;
+  data.forEach((row, index) => {
+    if (!row[col.po] || row[col.name].toString().startsWith("ERROR:")) {
+      Logger.log(`Skipping row ${index + 2}.`);
+      return; 
+    }
+// Read the data for the current row
+    let poNumber = row[col.po] || ""; 
+    let storeId = poNumber.substring(0, 4); // Gets the first 4 chars**
+    let shipToName = row[col.name] || "";
+    let address = row[col.address] || "";
+    let city = row[col.city] || "";
+    let state = row[col.state] || "";
+    let postal = row[col.postal] || "";
+    let sku = row[col.sku] || "";
+    let quantity = row[col.quantity] || "";
+    let storeNum = row[col.storeNum] || "";
+    let newLabelName = `Label_PO_${poNumber}_SKU_${sku}`;
+
+    try {
+      // 5. Create a copy of the template
+      let newFile = templateFile.makeCopy(newLabelName, saveFolder);
+      let newSlide = SlidesApp.openById(newFile.getId());
+      let slide = newSlide.getSlides()[0]; 
+
+      // 6. Replace all placeholder tags with data
+// 6. Replace all placeholder tags with data
+      slide.replaceAllText("{{LASTNAME,FIRSTNAME}}", shipToName); 
+      slide.replaceAllText("{{ORDER_DATE}}", new Date().toLocaleDateString()); 
+      slide.replaceAllText("{{PO_NUM}}", poNumber);
+      slide.replaceAllText("{{STORE_NUM}}", storeNum);
+      //slide.replaceAllText("{{STORE_NUM}}", "0000"); // Hardcoded
+      slide.replaceAllText("{{STORE_ID}}", storeId);
+      slide.replaceAllText("{{SKU}}", sku);
+      slide.replaceAllText("{{DESCRIPTION}}", `Description for ${sku}`); 
+      slide.replaceAllText("{{SHPTO_NAME}}", shipToName); 
+      slide.replaceAllText("{{STORE_NAME}}", city); 
+      slide.replaceAllText("{{ADDRESS}}", address);
+      slide.replaceAllText("{{CITY}}", city);
+      slide.replaceAllText("{{STATE}}", state);
+      slide.replaceAllText("{{ZIP_CODE}}", postal);
+      slide.replaceAllText("{{QUANTITY}}", quantity);
+
+      // 7. Save and create the PDF
+      newSlide.saveAndClose();
+      let pdf = newFile.getAs('application/pdf');
+      pdf.setName(newLabelName + ".pdf");
+      saveFolder.createFile(pdf);
+
+      // 8. Clean up
+      newFile.setTrashed(true);
+      generatedCount++;
+      Logger.log(`Created PDF: ${newLabelName}.pdf`);
+    } catch (e) {
+      Logger.log(`Error creating label for ${poNumber} (Row ${index + 2}): ${e.message}`);
+    }
+  });
+  Logger.log(`✅ ${generatedCount} labels generated!`);
+}
