@@ -1705,5 +1705,175 @@ function generateMenardsGreenLabels() {
   Logger.log(`✅ ${generatedCount} total labels generated!`);
 }
 
+// =======================================================
+// ============ GREEN LABEL Merging Function =============
+// =======================================================
+/**
+ * =============================================================
+ * FUNCTION 5: MERGE GREEN LABELS (With Backups)
+ * =============================================================
+ * Merges all individual labels from the source folder into a 
+ * single file in the destination folder. 
+ * **This version leaves the original files in the source folder as a backup.**
+ */
+function mergeGreenLabels() {
+  // --- Define Source, Destination, and Output Name ---
+  const sourceFolderUrl = 'https://drive.google.com/drive/folders/1xCOFzeAhfPqBoYIum5WVca2kSB0wUL14';
+  const destFolderUrl = 'https://drive.google.com/drive/folders/148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK';
+  const outputFileName = 'document-PS-menards-G.pdf'; // Desired output filename
+  // --- End Definitions ---
+
+  Logger.log(`Starting PDF Merge function for: ${outputFileName}`);
+
+  // --- Configuration Checks ---
+  // (This assumes PROJECT_KEY and SECRET_KEY are defined in this script file)
+  if (typeof PROJECT_KEY === 'undefined' || !PROJECT_KEY || PROJECT_KEY === 'YOUR_PROJECT_KEY' || 
+      typeof SECRET_KEY === 'undefined' || !SECRET_KEY || SECRET_KEY === 'YOUR_SECRET_KEY') {
+      Logger.log('ERROR: iLovePDF PROJECT_KEY/SECRET_KEY missing or not set.'); return; 
+  }
+  if (!sourceFolderUrl || !destFolderUrl || !outputFileName) {
+      Logger.log('ERROR: Source folder, Destination folder, or Output filename is missing in the function.'); return;
+  }
+  // --- End Checks ---
+
+  let sourceFolder, destFolder;
+  try {
+    sourceFolder = DriveApp.getFolderById(sourceFolderUrl.split('/').pop());
+    destFolder = DriveApp.getFolderById(destFolderUrl.split('/').pop());
+  } catch (folderError) {
+    Logger.log(`ERROR: Could not access source or destination folder. Check IDs. Details: ${folderError.message}`); return; 
+  }
+
+  // --- Get files from source, delete old merged file from destination ---
+  
+  // 1. Delete old merged file from destination
+  try {
+    const oldMergedFiles = destFolder.getFilesByName(outputFileName);
+    while (oldMergedFiles.hasNext()) {
+      const oldFile = oldMergedFiles.next();
+      oldFile.setTrashed(true);
+      Logger.log(`Found and deleted old merged file from destination: ${outputFileName}`);
+    }
+  } catch (e) {
+    Logger.log(`Warning: Could not check for/delete old merged file. ${e.message}`);
+  }
+
+  // 2. Get new files from source
+  const allFiles = sourceFolder.getFilesByType(MimeType.PDF);
+  const filesToProcess = [];
+
+  while (allFiles.hasNext()) {
+    const file = allFiles.next();
+    if (file.getName() !== outputFileName) { 
+      filesToProcess.push(file);
+    }
+  }
+  // --- END ---
 
 
+  // --- Handle 0, 1, or many files ---
+  if (filesToProcess.length === 0) {
+    Logger.log('No new PDF files found in source folder to merge.');
+    return;
+  }
+
+  if (filesToProcess.length === 1) {
+    // --- MODIFIED --- 
+    // Just copy and rename the single file, leaving the original
+    const file = filesToProcess[0];
+    const oldName = file.getName();
+    try {
+      file.makeCopy(outputFileName, destFolder); // Copy file to destination and rename it
+      Logger.log(`SUCCESS! Only one file found. Copied "${oldName}" to destination and renamed to "${outputFileName}". Original file is backed up.`);
+    } catch (e) {
+      Logger.log(`ERROR: Could not copy/rename single file. ${e.message}`);
+    }
+    return; // We are done
+  }
+  // --- END MODIFICATION ---
+
+  // If we get here, we have > 1 file to merge
+  Logger.log(`Found ${filesToProcess.length} files. Starting API merge...`);
+
+  try {
+    // (This assumes getIloveApiToken_() helper function is in this script file)
+    const authToken = getIloveApiToken_(); 
+    const headers = { 'Authorization': 'Bearer ' + authToken };
+
+    // === Step 1: Start Merge Task ===
+    Logger.log('Starting merge task...');
+    const startResponse = UrlFetchApp.fetch('https://api.ilovepdf.com/v1/start/merge', {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (startResponse.getResponseCode() !== 200) throw new Error(`Merge Start failed: ${startResponse.getContentText()}`);
+    const startData = JSON.parse(startResponse.getContentText());
+    const server = `https://${startData.server}`;
+    const taskId = startData.task;
+    Logger.log(`Task started with ID: ${taskId}`);
+
+    // === Step 2: Upload Files ===
+    const uploadedFiles = []; 
+    for (const file of filesToProcess) {
+      Logger.log(`Uploading file: ${file.getName()}...`);
+      const uploadResponse = UrlFetchApp.fetch(`${server}/v1/upload`, {
+        method: 'post',
+        headers: headers,
+        payload: { task: taskId, file: file.getBlob() },
+        muteHttpExceptions: true
+      });
+      if (uploadResponse.getResponseCode() !== 200) throw new Error(`Upload failed for ${file.getName()}: ${uploadResponse.getContentText()}`);
+      const uploadData = JSON.parse(uploadResponse.getContentText());
+      uploadedFiles.push({ server_filename: uploadData.server_filename, filename: file.getName() }); 
+      Logger.log(`Upload successful for ${file.getName()}`);
+    }
+
+    // === Step 3: Process the Merge Task ===
+    Logger.log(`Processing the merge for ${uploadedFiles.length} files...`);
+    const processPayload = {
+        task: taskId,
+        tool: 'merge',
+        files: uploadedFiles 
+    };
+
+    const processResponse = UrlFetchApp.fetch(`${server}/v1/process`, {
+      method: 'post',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(processPayload),
+      muteHttpExceptions: true
+    });
+      if (processResponse.getResponseCode() !== 200) {
+        let errorDetail = processResponse.getContentText();
+        try { const errorJson = JSON.parse(errorDetail); if (errorJson && errorJson.error && errorJson.error.message) { errorDetail = errorJson.error.message; } } catch(parseError) {}
+        throw new Error(`Merge Process failed (Status ${processResponse.getResponseCode()}): ${errorDetail}`);
+      }
+    Logger.log(`Processing successful: ${processResponse.getContentText()}`);
+    
+    // === Step 4: Download the Result ===
+    Logger.log('Downloading the final merged PDF...');
+    const downloadResponse = UrlFetchApp.fetch(`${server}/v1/download/${taskId}`, {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true 
+    });
+
+    if (downloadResponse.getResponseCode() !== 200) {
+        throw new Error(`Download failed with status ${downloadResponse.getResponseCode()}: ${downloadResponse.getContentText()}`);
+    }
+    
+    const mergedPdfBlob = downloadResponse.getBlob().setName(outputFileName); 
+    
+    // === Step 5: Save to Google Drive ===
+    const finalFile = destFolder.createFile(mergedPdfBlob);
+    Logger.log(`SUCCESS! File "${outputFileName}" saved to destination folder: ${finalFile.getUrl()}`);
+
+    // --- MODIFIED --- Step 6: Cleanup removed
+    Logger.log(`Cleanup step skipped. ${filesToProcess.length} individual files remain in source folder as backup.`);
+
+  } catch (e) {
+    Logger.log(`An error occurred during merge: ${e.toString()}`);
+      if (e.stack) { Logger.log(`Stack Trace: ${e.stack}`); }
+  }
+}
