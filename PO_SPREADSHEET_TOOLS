@@ -113,25 +113,17 @@ function extractMenardsShippingData() {
       if (lineItems.length === 0) throw new Error('No line items could be parsed from the PDF.');
       // --- In your extractMenardsShippingData function ---
 
-    // ...
-        for (const item of lineItems) {
-          
-          // --- BEFORE ---
-          // const rowData = [
-          //   poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
-          //   'STANDARD', item.weight, item.internalSku, poNumber, '', poNumber, item.quantity, 'N', '', shipToData.name, shipToData.name, 'menards'
-          // ];
-          
-          // --- AFTER ---
-          const rowData = [
-            poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
-            'STANDARD', item.weight, item.internalSku, poNumber, '', shipToData.storeNum, item.quantity, 'N', '', shipToData.name, shipToData.name, 'menards'
-          ];
-          // Note: The 16th value (Col P) was poNumber, now it's shipToData.storeNum
+     for (const item of lineItems) {
+        
+        // --- THIS IS THE LINE TO CHANGE ---
+        const rowData = [
+          poNumber, shipToData.name, shipToData.address, '', '', shipToData.city, shipToData.state, shipToData.postal, 'US', shipToData.phone,
+          'STANDARD', item.weight, item.internalSku, poNumber, shipToData.customerName, shipToData.storeNum, item.quantity, 'N', '', shipToData.name, shipToData.name, 'menards'
+        ];
+        // ----------------------------------
 
-          sheet.appendRow(rowData);
-        }
-    // ...
+        sheet.appendRow(rowData);
+      }
       processedCount++;
     } catch (e) {
       Logger.log(`Error processing ${file.getName()}: ${e.message}`);
@@ -206,18 +198,41 @@ function getOcrText_(file) {
   return { content: text, tempDocId: ocrFile.id };
 }
 
+/**
+ * Parses the OCR text to extract shipping, customer, and store info.
+ * @param {string} text The full OCR text from the PDF.
+ * @return {object} An object containing the parsed data.
+ */
 function parseShipToBlock_(text) {
-  // 1. Added 'storeNum: '' ' to the data object
-  const data = { name: '', address: '', city: '', state: '', postal: '', phone: '', storeNum: '' };
+  
+  // 1. Initialize the data object with all the new fields
+  const data = { 
+    name: '', 
+    address: '', 
+    city: '', 
+    state: '', 
+    postal: '', 
+    phone: '', 
+    storeNum: '', 
+    customerName: '' 
+  };
 
-  // --- THIS IS THE UPDATED LINE ---
-  // It now looks for the number after "Bill To:"
+  // 2. --- Find the Store Number ---
+  // Looks for "Bill To:" followed by a number
   const storeMatch = text.match(/Bill To:\s*(\d+)/i);
   if (storeMatch && storeMatch[1]) {
     data.storeNum = storeMatch[1].trim(); // e.g., "3268"
   }
-  // ---------------------------------------------
 
+  // 3. --- Find the Customer Name ---
+  // Looks for "Guest Information:" followed by a name on the next line
+  const guestMatch = text.match(/Guest Information:\s*\n\s*([^\n]+)/i);
+  if (guestMatch && guestMatch[1]) {
+    data.customerName = guestMatch[1].trim(); // e.g., "Dunham, Carl"
+  }
+
+  // 4. --- Original "Ship To" Block Parsing Logic ---
+  // (This is your original code, it remains unchanged)
   const match = text.match(/Ship To:\s*([\s\S]*?)(?=Guest Information:|Bill To:)/i);
 
   if (match && match[1]) {
@@ -252,9 +267,10 @@ function parseShipToBlock_(text) {
       if(addressLine) data.address = addressLine;
     }
   }
+  
+  // 5. Return the complete data object
   return data;
 }
-
 function parseLineItems_(text) {
   const items = [];
   const itemRegex = /1002485\s+DIGDE001 Special Order\s+(\d+)\s+[\d,.]+\s+Package\s+[\d,.]+\s+Vendor Part #:\s*([\w-]+)/g;
