@@ -224,7 +224,13 @@
             <button class="remote-btn pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
           </div>
         </details>
-
+        <details>
+          <summary>Menards</summary>
+          <div class="panel">
+            <button class="remote-btn menards" onclick="runFunction('generateMenardsGreenLabels')">Create Green Labels</button>
+            <button class="remote-btn menards" onclick="runFunction('mergeGreenLabels')">Merge and/or Copy Label(s)</button>           
+          </div>
+        </details>
         <details>
           <summary>Prepping</summary>
           <div class="panel">
@@ -313,7 +319,9 @@
         'moveShippingDocuments': 'Moving Docs to Email Folder...',
         'prepareShippingDocs': 'Running Email Prep... 📧',
         'purgeDailyShippingDocs': 'Purging Daily Docs... 🗑️',
-        'purgeAllPDFs': 'PURGING ALL PDFs... ⚠️'
+        'purgeAllPDFs': 'PURGING ALL PDFs... ⚠️',
+        'generateMenardsGreenLabels': 'Creating Green Labels... 🏷️',
+        'mergeGreenLabels': 'Merging Green Labels... 🖇️'
       };
 
       // --- UPDATED runFunction ---
