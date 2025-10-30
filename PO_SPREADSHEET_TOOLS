@@ -1,65 +1,93 @@
-// =================== PO Spreadsheet Script ===================
-
-// ----- Menu setup -----
+/**
+ * Creates the custom menus for the spreadsheet.
+ * This runs when the spreadsheet is opened.
+ */
 function onOpen() {
-  const ui = SpreadsheetApp.getUi();
+  var ui = SpreadsheetApp.getUi();
 
-  // Menu 1: Inbound (Import / Convert / Validate)
-  ui.createMenu('Inbound')
-    // Conversion
-    .addItem('--- 🔄 Conversion ---', 'doNothing')
+  // --- Menu 1: Inbound (REVISED) ---
+  // Create the sub-menus first
+  var conversionMenu = ui.createMenu('🔄 Conversion')
     .addItem('Extract Menards POs from PDF', 'extractMenardsShippingData')
     .addItem('Extract WCS POs from PDF', 'extractWCSData')
     .addItem('Amazon Order Import', 'importPSAmazonAnyTxt')
     .addItem('Dig Defence Import', 'digDefence')
     .addItem("Home Depot Import", 'importHomeDepotNeworders')
     .addItem("Lowe's Import", 'importLowesNeworders')
-    .addItem("Sam's Import", 'convertSamsExcelToCSVAndImport')
-    // Validation
-    .addItem('--- ✅ Validation ---', 'doNothing')
+    .addItem("Sam's Import", 'convertSamsExcelToCSVAndImport');
+
+  var validationMenu = ui.createMenu('✅ Validation')
     .addItem('Apply Weight to Column L', 'applyWeightFormula')
     .addItem('Fix Zip Codes in Column H', 'fixZipCodes')
-    .addItem('Check Lowes/Home Depot Limits', 'checkLowesHomeDepotLimits')
+    .addItem('Check Lowes/Home Depot Limits', 'checkLowesHomeDepotLimits');
+
+  // Add the sub-menus to the main "Inbound" menu
+  ui.createMenu('Inbound')
+    .addSubMenu(conversionMenu)
+    .addSubMenu(validationMenu)
     .addToUi();
 
-  // Menu 2: Outbound (Export / Combine)
-  ui.createMenu('Outbound')
-    .addItem('--- 📦 Amazon ---', 'doNothing')
+  // --- Menu 2: Outbound (REVISED) ---
+  // This was the main problem. We'll create a sub-menu for each client.
+  var outboundMenu = ui.createMenu('Outbound');
+
+  var amazonSubMenu = ui.createMenu('📦 Amazon')
     .addItem('Export Amazon', 'exportPSAmazon')
     .addItem('Export Amazon Thurs', 'exportPSAmazonThurs')
-    .addItem('Export Amazon Sun', 'exportPSAmazonSun')
-    .addItem('--- 🐶 Dig Defence ---', 'doNothing')
+    .addItem('Export Amazon Sun', 'exportPSAmazonSun');
+  outboundMenu.addSubMenu(amazonSubMenu);
+
+  var ddSubMenu = ui.createMenu('🐶 Dig Defence')
     .addItem('Export To: document-PS-dd', 'document_PS_dd')
     .addItem('Export To: document-PS-dd-thurs', 'document_PS_dd_thurs')
-    .addItem('Export To: document-PS-dd-sun', 'document_PS_dd_sun')
-    .addItem('--- 🏠 Home Depot ---', 'doNothing')
+    .addItem('Export To: document-PS-dd-sun', 'document_PS_dd_sun');
+  outboundMenu.addSubMenu(ddSubMenu);
+
+  var hdSubMenu = ui.createMenu('🏠 Home Depot')
     .addItem('Export To: document-PS-homedepot', 'exportPSHomeDepot')
     .addItem('Export To: document-PS-homedepot-thurs', 'exportPSHomeDepotThurs')
-    .addItem('Export To: document-PS-homedepot-sun', 'exportPSHomeDepotSun')
-    .addItem('--- 🏬 Lowes ---', 'doNothing')
+    .addItem('Export To: document-PS-homedepot-sun', 'exportPSHomeDepotSun');
+  outboundMenu.addSubMenu(hdSubMenu);
+
+  var lowesSubMenu = ui.createMenu('🏬 Lowes')
     .addItem('Export To: document-PS-lowes', 'exportPSLowes')
     .addItem('Export To: document-PS-lowes-thurs', 'exportPSLowesThurs')
-    .addItem('Export To: document-PS-lowes-sun', 'exportPSLowesSun')
-    .addItem('--- 🏢 Menards ---', 'doNothing')
+    .addItem('Export To: document-PS-lowes-sun', 'exportPSLowesSun');
+  outboundMenu.addSubMenu(lowesSubMenu);
+
+  var menardsSubMenu = ui.createMenu('🏢 Menards')
     .addItem('Export To: document-PS-menards', 'exportPSMenards')
     .addItem('Export To: document-PS-menards-thurs', 'exportPSMenardsThurs')
-    .addItem('Export To: document-PS-menards-sun', 'exportPSMenardsSun')
-    .addItem('--- 🛒 Sams ---', 'doNothing')
+    .addItem('Export To: document-PS-menards-sun', 'exportPSMenardsSun');
+  outboundMenu.addSubMenu(menardsSubMenu);
+
+  var samsSubMenu = ui.createMenu('🛒 Sams')
     .addItem('Export To: document-PS-sams', 'exportPSSams')
     .addItem('Export To: document-PS-sams-thurs', 'exportPSSamsThurs')
-    .addItem('Export To: document-PS-sams-sun', 'exportPSSamsSun')
-    .addItem('--- 🌐 WCS ---', 'doNothing')
+    .addItem('Export To: document-PS-sams-sun', 'exportPSSamsSun');
+  outboundMenu.addSubMenu(samsSubMenu);
+
+  var wcsSubMenu = ui.createMenu('🌐 WCS')
     .addItem('Export To: document-PS-wcs', 'exportPSWCS')
     .addItem('Export To: document-PS-wcs-thurs', 'exportPSWCSThurs')
-    .addItem('Export To: document-PS-wcs-sun', 'exportPSWCSSun')
-    .addItem('--- 🔗 Combine CSVs ---', 'doNothing')
-    .addItem('Combine Daily CSV Files (document-PS-combined)', 'combineCSVFiles')
-    .addItem('Combine Weekend CSV Files (document-PS-combined-sun)', 'combineSundayCSVFiles')
-    .addToUi();
+    .addItem('Export To: document-PS-wcs-sun', 'exportPSWCSSun');
+  outboundMenu.addSubMenu(wcsSubMenu);
 
-  // Menu 3: Clean Up
+  // Add a separator line before the "Combine" sub-menu
+  outboundMenu.addSeparator();
+
+  var combineSubMenu = ui.createMenu('🔗 Combine CSVs')
+    .addItem('Combine Daily CSV Files (document-PS-combined)', 'combineCSVFiles')
+    .addItem('Combine Weekend CSV Files (document-PS-combined-sun)', 'combineSundayCSVFiles');
+  outboundMenu.addSubMenu(combineSubMenu);
+
+  // Add the fully built "Outbound" menu to the UI
+  outboundMenu.addToUi();
+
+  // --- Menu 3: Clean Up (REVISED) ---
+  // Replaced the 'doNothing' item with a proper separator
   ui.createMenu('Clean Up')
-    .addItem('--- 🧹 Maintenance ---', 'doNothing')
+    .addSeparator() // This creates the '--- 🧹 Maintenance ---' line
     .addItem('Reset Formatting', 'resetFormatting')
     .addItem('Delete Sheet', 'clearSheet')
     .addItem('Purge Downloads', 'purgeFiles')
@@ -67,8 +95,8 @@ function onOpen() {
     .addToUi();
 }
 
-// placeholder no-op used as label in menu
-function doNothing() {}
+// NOTE: The 'doNothing()' function is no longer needed with this new structure.
+// You can safely delete it from your script.
 
 
 // =============================================================
