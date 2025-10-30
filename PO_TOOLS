@@ -1605,10 +1605,8 @@ function generateMenardsGreenLabels() {
   const data = sheet.getDataRange().getValues(); 
 
   // 2. Get the template file and save folder
-  // --- THESE LINES WERE MISSING ---
   const templateFile = DriveApp.getFileById(MENARDS_SHIPPING_CONFIG.LABEL_TEMPLATE_ID);
   const saveFolder = DriveApp.getFolderById(MENARDS_SHIPPING_CONFIG.LABEL_SAVE_FOLDER_ID);
-  // --------------------------------
 
   // 3. Get headers to find column positions dynamically
   const headers = data.shift();
@@ -1630,81 +1628,134 @@ function generateMenardsGreenLabels() {
     return;
   }
 
-  // 4. Loop through each row of data
-  let generatedCount = 0;
+  // 4. PRE-PROCESS DATA: Group rows by PO number and get total quantities
+  const poDataMap = {};
+
   data.forEach((row, index) => {
-    // Read the data for the current row
-    let poNumber = row[col.po] || ""; 
-    let storeId = poNumber.substring(0, 4); 
-    let shipToName = row[col.name] || "";
-    let address = row[col.address] || "";
-    let city = row[col.city] || "";
-    let state = row[col.state] || "";
-    let postal = row[col.postal] || "";
-    let sku = row[col.sku] || ""; // This gets the SKU
-    let quantity = row[col.quantity] || "1"; 
-    let storeNum = row[col.storeNum] || "";
-    let customerName = row[col.customerName] || "";
-    
-    // Look up the description from the map
-    let skuDescription = SKU_MAP[sku] || ""; // Gets the matching description
-    
-    let totalPackages = parseInt(quantity, 10);
-    if (isNaN(totalPackages) || totalPackages < 1) {
-      totalPackages = 1; 
+    let poNumber = (row[col.po] || "").toString().trim();
+
+    // Skip MCOM orders or rows with no PO number
+    if (poNumber.startsWith("MCOM") || !poNumber) {
+      if (poNumber.startsWith("MCOM")) {
+        Logger.log(`Skipping MCOM order (Row ${index + 2}): ${poNumber}`);
+      }
+      return; // Skip to the next row
     }
 
-    for (let i = 1; i <= totalPackages; i++) {
-      let currentPackage = i; 
-      let newLabelName = `Label_PO_${poNumber}_SKU_${sku}_(${currentPackage}_of_${totalPackages})`;
+    let quantity = parseInt(row[col.quantity], 10);
+    if (isNaN(quantity) || quantity < 1) {
+      quantity = 1;
+    }
 
-      try {
-        // ... (copy template) ...
-        let newFile = templateFile.makeCopy(newLabelName, saveFolder);
-        let newSlide = SlidesApp.openById(newFile.getId());
-        let slide = newSlide.getSlides()[0]; 
+    // If this is the first time seeing this PO, create an entry
+    if (!poDataMap[poNumber]) {
+      poDataMap[poNumber] = {
+        totalQty: 0,
+        rows: []
+      };
+    }
 
-        // 6. Replace all placeholder tags with data
-        let finalName = customerName ? customerName.toUpperCase() : shipToName;
-        slide.replaceAllText("{{LASTNAME,FIRSTNAME}}", finalName);
+    // Add this row's quantity to the PO's grand total
+    poDataMap[poNumber].totalQty += quantity;
 
-        slide.replaceAllText("{{ORDER_DATE}}", new Date().toLocaleDateString()); 
-        slide.replaceAllText("{{PO_NUM}}", poNumber);
-        slide.replaceAllText("{{STORE_NUM}}", storeNum);
-        slide.replaceAllText("{{STORE_ID}}", storeId);
-        slide.replaceAllText("{{SKU}}", sku);
-        
-        slide.replaceAllText("{{SKU_DESCRIPT}}", skuDescription);
-        
-        slide.replaceAllText("{{SHPTO_NAME}}", shipToName); 
-        slide.replaceAllText("{{STORE_NAME}}", city); 
-        slide.replaceAllText("{{ADDRESS}}", address);
-        slide.replaceAllText("{{CITY}}", city);
-        slide.replaceAllText("{{STATE}}", state);
-        slide.replaceAllText("{{ZIP_CODE}}", postal);
-        slide.replaceAllText("{{QUANTITY}}", quantity); 
-        slide.replaceAllText("{{p1}}", currentPackage);
-        slide.replaceAllText("{{p2}}", totalPackages);
-
-        // 7. Save and create the PDF
-        newSlide.saveAndClose();
-        let pdf = newFile.getAs('application/pdf');
-        pdf.setName(newLabelName + ".pdf");
-        saveFolder.createFile(pdf);
-        
-        // 8. Clean up
-        newFile.setTrashed(true);
-        generatedCount++;
-        Logger.log(`Created PDF: ${newLabelName}.pdf`);
-
-      } catch (e) {
-        Logger.log(`Error creating label for ${poNumber} (Row ${index + 2}, Pkg ${currentPackage}): ${e.message}`);
-      }
-    } 
+    // Store all the row's data for later
+    const rowData = {
+      poNumber: poNumber,
+      storeId: poNumber.substring(0, 4),
+      shipToName: row[col.name] || "",
+      address: row[col.address] || "",
+      city: row[col.city] || "",
+      state: row[col.state] || "",
+      postal: row[col.postal] || "",
+      sku: row[col.sku] || "",
+      quantity: quantity, // The quantity *for this line item*
+      storeNum: row[col.storeNum] || "",
+      customerName: row[col.customerName] || "",
+      originalRowIndex: index + 2 // For logging errors
+    };
+    poDataMap[poNumber].rows.push(rowData);
   });
+
+  // 5. PROCESS LABELS: Loop through the aggregated PO groups
+  let generatedCount = 0;
+  
+  // Now, loop through each unique PO number we found
+  Object.keys(poDataMap).forEach(poNumber => {
+    
+    const poData = poDataMap[poNumber];
+    
+    // {{p2}} is the grand total for the entire PO
+    const totalPackages = poData.totalQty; 
+    
+    // {{p1}} is the running counter for *this* PO
+    let currentPackage = 1; 
+
+    // Loop through each line item (row) associated with this PO
+    poData.rows.forEach(row => {
+      
+      // This is the quantity for *this specific line item*
+      const lineItemQuantity = row.quantity; 
+      const skuDescription = SKU_MAP[row.sku] || "";
+
+      // Loop 'lineItemQuantity' times 
+      // (e.g., if this row's quantity is 2, loop twice)
+      for (let i = 1; i <= lineItemQuantity; i++) {
+        
+        // Use the running counters for the label name
+        let newLabelName = `Label_PO_${poNumber}_SKU_${row.sku}_(${currentPackage}_of_${totalPackages})`;
+
+        try {
+          let newFile = templateFile.makeCopy(newLabelName, saveFolder);
+          let newSlide = SlidesApp.openById(newFile.getId());
+          let slide = newSlide.getSlides()[0]; 
+
+          // 6. Replace all placeholder tags with data
+          let finalName = row.customerName ? row.customerName.toUpperCase() : row.shipToName;
+          slide.replaceAllText("{{LASTNAME,FIRSTNAME}}", finalName);
+
+          slide.replaceAllText("{{ORDER_DATE}}", new Date().toLocaleDateString()); 
+          slide.replaceAllText("{{PO_NUM}}", row.poNumber);
+          slide.replaceAllText("{{STORE_NUM}}", row.storeNum);
+          slide.replaceAllText("{{STORE_ID}}", row.storeId);
+          slide.replaceAllText("{{SKU}}", row.sku);
+          slide.replaceAllText("{{SKU_DESCRIPT}}", skuDescription);
+          slide.replaceAllText("{{SHPTO_NAME}}", row.shipToName); 
+          slide.replaceAllText("{{STORE_NAME}}", row.city); 
+          slide.replaceAllText("{{ADDRESS}}", row.address);
+          slide.replaceAllText("{{CITY}}", row.city);
+          slide.replaceAllText("{{STATE}}", row.state);
+          slide.replaceAllText("{{ZIP_CODE}}", row.postal);
+          
+          // {{QUANTITY}} is the quantity for this specific SKU/line item
+          slide.replaceAllText("{{QUANTITY}}", row.quantity.toString()); 
+          
+          // *** THE KEY TWEAK ***
+          slide.replaceAllText("{{p1}}", currentPackage);  // The running counter (1, 2, 3...)
+          slide.replaceAllText("{{p2}}", totalPackages);    // The grand total (e.g., 3)
+
+          // 7. Save and create the PDF
+          newSlide.saveAndClose();
+          let pdf = newFile.getAs('application/pdf');
+          pdf.setName(newLabelName + ".pdf");
+          saveFolder.createFile(pdf);
+          
+          // 8. Clean up
+          newFile.setTrashed(true);
+          generatedCount++;
+          Logger.log(`Created PDF: ${newLabelName}.pdf`);
+
+          // Increment the running package counter *after* generating the label
+          currentPackage++;
+
+        } catch (e) {
+          Logger.log(`Error creating label for ${poNumber} (Row ${row.originalRowIndex}, Pkg ${currentPackage}): ${e.message}`);
+        }
+      } // End of for loop (i <= lineItemQuantity)
+    }); // End of poData.rows.forEach
+  }); // End of Object.keys(poDataMap).forEach
+
   Logger.log(`✅ ${generatedCount} total labels generated!`);
 }
-
 // =======================================================
 // ============ GREEN LABEL Merging Function =============
 // =======================================================
