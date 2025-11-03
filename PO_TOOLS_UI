@@ -79,94 +79,85 @@
     .menards:hover { background: #43a047; }
     .wcs:hover { background: #f57c00; }
 
-    /* --- UPDATED TOAST CSS --- */
     #toast {
       position: fixed;
       bottom: 20px;
-      left: 10px;  /* Spans the width on mobile */
+      left: 10px;
       right: 10px;
       background-color: #333;
       color: white;
-      padding: 20px 24px;   /* Increased padding */
+      padding: 20px 24px;
       border-radius: 8px;
       display: none;
       z-index: 1000;
-      font-size: 2.0rem;    /* Significantly larger font */
+      font-size: 2rem;
       text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5); /* Added shadow for visibility */
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
 
-    /* On larger screens, move it back to the corner */
     @media (min-width: 768px) {
       #toast {
-        left: auto; /* Reset left */
+        left: auto;
         right: 20px;
         bottom: 20px;
-        max-width: 450px; /* Give it a max width */
-        text-align: left; /* Reset text alignment */
+        max-width: 450px;
+        text-align: left;
       }
     }
-    /* --- END UPDATED CSS --- */
 
     @media (hover: none) {
       summary { padding: 25px; }
     }
 
-/* --- Custom Confirm Modal CSS --- */
-#confirmOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 2000;
-  display: none; /* Hidden by default */
-  align-items: center;
-  justify-content: center;
-}
+    #confirmOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
 
-#confirmBox {
-  background: #1e1e1e;
-  padding: 24px;
-  border-radius: 8px;
-  border: 1px solid #333;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-  width: 90%;
-  max-width: 500px;
-}
+    #confirmBox {
+      background: #1e1e1e;
+      padding: 24px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+      width: 90%;
+      max-width: 500px;
+    }
 
-#confirmMessage {
-  font-size: 2.5rem; /* Large font */
-  color: #e0e0e0;
-  margin-bottom: 20px;
-  line-height: 1.4;
-  text-align: center;
-}
+    #confirmMessage {
+      font-size: 2.5rem;
+      color: #e0e0e0;
+      margin-bottom: 20px;
+      line-height: 1.4;
+      text-align: center;
+    }
 
-#confirmButtons {
-  display: flex;
-  justify-content: space-around;
-  gap: 15px;
-}
+    #confirmButtons {
+      display: flex;
+      justify-content: space-around;
+      gap: 15px;
+    }
 
-#confirmButtons .remote-btn {
-   width: 45%; /* Buttons share the space */
-   margin-bottom: 0; /* Remove default margin */
-   font-size: 2.5rem; /* Match message */
-}
+    #confirmButtons .remote-btn {
+      width: 45%;
+      margin-bottom: 0;
+      font-size: 2.5rem;
+    }
 
-/* Style the "No" button to be less prominent */
-#confirmBtnNo {
-  background: #555;
-}
-#confirmBtnNo:hover {
-  background: #666;
-}
-/* --- End Custom Modal CSS --- */
-
-
-
+    #confirmBtnNo {
+      background: #555;
+    }
+    #confirmBtnNo:hover {
+      background: #666;
+    }
   </style>
 </head>
 <body>
@@ -184,7 +175,6 @@
             <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
             <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
             <button class="remote-btn pdf" onclick="runFunction('renameFileToPDF')">Rename Files With No Extension to PDF</button>
-            
           </div>
         </details>
 
@@ -201,7 +191,7 @@
             </details>
           </div>
         </details>
-        
+
         <details>
           <summary>Sunday File Renaming</summary>
           <div class="panel">
@@ -224,20 +214,23 @@
             <button class="remote-btn pdf" onclick="runFunction('copyShippingManifestPDFs')">Copy Shipping Manifests</button>
           </div>
         </details>
+
         <details>
           <summary>Menards</summary>
           <div class="panel">
             <button class="remote-btn menards" onclick="runFunction('generateMenardsGreenLabels')">Create Green Labels</button>
-            <button class="remote-btn menards" onclick="runFunction('mergeGreenLabels')">Merge and/or Copy Label(s)</button>           
+            <button class="remote-btn menards" onclick="runFunction('mergeGreenLabels')">Merge and/or Copy Label(s)</button>
           </div>
         </details>
+
         <details>
           <summary>Prepping</summary>
           <div class="panel">
-            <button class="remote-btn pdf" onclick="runFunction('emailPageCountReport')">Generate Pack Count</button>
+            <button class="remote-btn pdf" onclick="runFunction('emailSmartPageCountReport')">Generate Pack Count</button>
             <button class="remote-btn pdf" onclick="runFunction('mergeManifests')">Merge Manifests</button>
             <button class="remote-btn pdf" onclick="runFunction('moveShippingDocuments')">Move Shipping Documents To Email Folder</button>
             <button class="remote-btn emailprep" onclick="runFunction('prepareShippingDocs')">Run Email Prep</button>
+            <button class="remote-btn emailprep" onclick="runFunction('sendPdfsFromFolder')">Attach Files And Email</button>
           </div>
         </details>
 
@@ -256,23 +249,23 @@
 
   <div id="toast"></div>
 
-<script>
-    // --- NEW LINE ---
-    // This tells the script to wait until the HTML page is fully loaded
-    document.addEventListener('DOMContentLoaded', () => {
+  <div id="confirmOverlay">
+    <div id="confirmBox">
+      <div id="confirmMessage"></div>
+      <div id="confirmButtons">
+        <button id="confirmBtnYes" class="remote-btn purge">Yes</button>
+        <button id="confirmBtnNo" class="remote-btn">No</button>
+      </div>
+    </div>
+  </div>
 
-      // --- Custom Confirm Modal Logic ---
-      // Now these are guaranteed to be found!
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
       const confirmOverlay = document.getElementById('confirmOverlay');
       const confirmMessageEl = document.getElementById('confirmMessage');
       const confirmBtnYes = document.getElementById('confirmBtnYes');
       const confirmBtnNo = document.getElementById('confirmBtnNo');
 
-      /**
-       * Shows a custom, styleable confirm dialog.
-       * @param {string} message The message to display.
-       * @returns {Promise<boolean>} Resolves true for "Yes", false for "No".
-       */
       function customConfirm(message) {
         confirmMessageEl.textContent = message;
         confirmOverlay.style.display = 'flex';
@@ -280,17 +273,15 @@
         return new Promise((resolve) => {
           confirmBtnYes.addEventListener('click', () => {
             confirmOverlay.style.display = 'none';
-            resolve(true); // User clicked "Yes"
+            resolve(true);
           }, { once: true });
 
           confirmBtnNo.addEventListener('click', () => {
             confirmOverlay.style.display = 'none';
-            resolve(false); // User clicked "No"
+            resolve(false);
           }, { once: true });
         });
       }
-      // --- End Custom Confirm ---
-
 
       function showToast(message) {
         const toast = document.getElementById('toast');
@@ -299,7 +290,6 @@
         setTimeout(() => { toast.style.display = 'none'; }, 3000);
       }
 
-      // Your custom toast messages
       const toastMessages = {
         'renameTradingPartnerFiles': 'Renaming Partner Slips...',
         'renameShippingLabels': 'Renaming Shipping Labels...',
@@ -315,22 +305,18 @@
         'copyShippingLabelPDFs': 'Copying Shipping Labels...',
         'copyShippingManifestPDFs': 'Copying Manifests...',
         'emailPageCountReport': 'Generating Pack Count Report...',
-        'mergeManifests': 'Merging Manifests... 🖇️',
+        'mergeManifests': 'Merging Manifests...',
         'moveShippingDocuments': 'Moving Docs to Email Folder...',
-        'prepareShippingDocs': 'Running Email Prep... 📧',
-        'purgeDailyShippingDocs': 'Purging Daily Docs... 🗑️',
-        'purgeAllPDFs': 'PURGING ALL PDFs... ⚠️',
-        'generateMenardsGreenLabels': 'Creating Green Labels... 🏷️',
-        'mergeGreenLabels': 'Merging Green Labels... 🖇️'
+        'prepareShippingDocs': 'Running Email Prep...',
+        'sendPdfsFromFolder': 'Attaching PDFs & sending email...',
+        'purgeDailyShippingDocs': 'Purging Daily Docs...',
+        'purgeAllPDFs': 'PURGING ALL PDFs...',
+        'generateMenardsGreenLabels': 'Creating Green Labels...',
+        'mergeGreenLabels': 'Merging Green Labels...'
       };
 
-      // --- UPDATED runFunction ---
-      // We must attach this function to the global 'window' object
-      // so the 'onclick=""' in the HTML can find it inside the listener.
       window.runFunction = async function(funcName) {
-        
         if (funcName === 'purgeDailyShippingDocs' || funcName === 'purgeAllPDFs') {
-          
           let confirmMessage = 'Are you sure?';
           if (funcName === 'purgeDailyShippingDocs') {
             confirmMessage = 'ARE YOU SURE you want to purge the Daily Shipping Doc Folder?';
@@ -339,42 +325,30 @@
           }
 
           const confirmed = await customConfirm(confirmMessage);
-          
           if (!confirmed) {
             showToast('Purge cancelled.');
-            return; 
+            return;
+          }
+        } else if (funcName === 'sendPdfsFromFolder') {
+          const confirmMessage = "Send email now? (Note: The automatic 11 PM email is still scheduled. This will send an extra email immediately.)";
+          const confirmed = await customConfirm(confirmMessage);
+          if (!confirmed) {
+            showToast('Email send cancelled.');
+            return;
           }
         }
-        
+
         const defaultMessage = `Running ${funcName}...`;
         const initialMessage = toastMessages[funcName] || defaultMessage;
 
-        showToast(initialMessage); 
-        
+        showToast(initialMessage);
+
         google.script.run
-          .withSuccessHandler(result => showToast(result)) 
+          .withSuccessHandler(result => showToast(result))
           .withFailureHandler(error => showToast(`Error in ${funcName}: ${error.message}`))
           [funcName]();
-      }
-
-    // --- NEW LINE ---
-    // Closes the DOMContentLoaded listener
+      };
     });
   </script>
-
-
-
-
-
-
-  <div id="confirmOverlay">
-  <div id="confirmBox">
-    <div id="confirmMessage"></div>
-    <div id="confirmButtons">
-      <button id="confirmBtnYes" class="remote-btn purge">Yes</button>
-      <button id="confirmBtnNo" class="remote-btn">No</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
