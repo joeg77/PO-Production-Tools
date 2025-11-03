@@ -950,7 +950,227 @@ function parseWCSLineItems_(text) {
   }
   return items;
 }
+// =======================================================
+// =======================================================
 
+/**
+ * Scans a single folder for all PDF files, calculates their native page count,
+ * and attributes the count to a partner based on filename patterns.
+ * Finally, it emails a consolidated report.
+ */
+/**
+ * Scans a single folder, attributes files to partners using filename patterns,
+ * and generates a report with separate counts for POs (regular) and
+ * Packages (files ending in -L.pdf).
+ *
+ * It skips files ending in -SOS.pdf, -G.pdf, or containing -ddpos.
+ */
+function emailSmartPageCountReport() {
+  Logger.log('Starting Smart Page Count Report function...');
+
+  // --- Configuration ---
+  const REPORT_FOLDER_ID = '148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK'; // The single folder to scan
+
+  // --- Your filename patterns (This is correct from last time) ---
+  const partnerFilePatterns = {
+    'Amazon': ['-amazon', '-amazon-thurs-', 'amazon-sun'],
+    'Chewy': ['-chewy', '-chewy-thurs-', 'chewy-sun'],
+    'Dig Defence': ['-dd', '-dd-thurs-', 'dd-sun'],
+    'Home Depot': ['-homedepot', '-homedepot-thurs-', 'homedepot-sun'],
+    'Lowes': ['-lowes', '-lowes-thurs-', 'lowes-sun'],
+    'Menards': ['-menards', '-menards-thurs-', 'menards-sun'],
+    'Misc': ['-misc', '-misc-thurs-', 'misc-sun'],
+    'Petco': ['-petco', '-petco-thurs-', 'petco-sun'],
+    'Sams': ['-sams', 'sams-sun', 'sams-thurs-'], // Flipped order, but same result
+    'Shein': ['-shein', '-shein-thurs-', 'shein-sun'],
+    'Temu': ['-temu', '-temu-thurs-', 'temu-sun'],
+    'TSC': ['-tsc', '-tsc-thurs-', 'tsc-sun'],
+    'Wal-Mart': ['-walmart', '-walmart-thurs-', 'walmart-sun', 'wal-mart-'],
+    'WCS': ['-wcs', '-wcs-thurs-', 'wcs-sun'],
+    'Wayfair': ['-wf', '-wf-thurs-', 'wf-sun']
+  };
+  // --- End Patterns ---
+
+
+  // --- Configuration Checks ---
+  if (typeof REPORT_EMAIL_ADDRESS === 'undefined' || !REPORT_EMAIL_ADDRESS || REPORT_EMAIL_ADDRESS === 'your-email@example.com') {
+    Logger.log('ERROR: REPORT_EMAIL_ADDRESS is not defined in your script or is a placeholder.');
+    return;
+  }
+  // --- End Checks ---
+
+  // --- NEW: Initialize two sets of report data ---
+  let poReportData = {};
+  let packageReportData = {};
+  let grandTotalPoCount = 0;
+  let grandTotalPackageCount = 0;
+  const partnerNames = Object.keys(partnerFilePatterns);
+
+  // Initialize both report objects
+  partnerNames.forEach(name => {
+    poReportData[name] = 0;
+    packageReportData[name] = 0;
+  });
+
+  
+  // --- Helper function to get page count (copied from your original) ---
+// --- Helper function to get page count (copied from your original) ---
+  function getNativePageCount(file) {
+    let filePageCount = 0;
+    try {
+      const blob = file.getBlob();
+      // --- FIX IS HERE: 'ISO-8859-1' (with a 5, not an 8) ---
+      const content = blob.getDataAsString('ISO-8859-1'); 
+      const pageRegex = /\/Type\s*\/Page\b/g;
+      const matches = content.match(pageRegex);
+
+      if (matches && matches.length > 0) {
+        filePageCount = matches.length;
+      } else {
+        Logger.log(`Warning: Could not find /Type /Page in: ${file.getName()}. Trying /Pages /Count...`);
+        const countRegex = /\/Type\s*\/Pages[\s\S]*?\/Count\s+(\d+)/;
+        const countMatch = content.match(countRegex);
+
+        if (countMatch && countMatch[1]) {
+          filePageCount = parseInt(countMatch[1], 10);
+          Logger.log(`--> Fallback succeeded. Found /Pages /Count of: ${filePageCount}`);
+        } else {
+          Logger.log(`--> ERROR: All parsing methods failed for ${file.getName()}. Returning 0.`);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error natively processing file ${file.getName()}: ${e.message}`);
+      if (e.message.includes("exceeded maximum execution time")) {
+        Logger.log(`--> File ${file.getName()} might be too large for native text extraction.`);
+      }
+    }
+    return filePageCount;
+  }
+  // --- End Helper ---
+  // --- End Helper ---
+
+
+  // --- Main Logic ---
+  try {
+    Logger.log(`Scanning folder ID: ${REPORT_FOLDER_ID}...`);
+    const folder = DriveApp.getFolderById(REPORT_FOLDER_ID);
+    const files = folder.getFilesByType(MimeType.PDF);
+
+    while (files.hasNext()) {
+      const file = files.next();
+      const fileName = file.getName();
+      const fileNameLower = fileName.toLowerCase(); // Use lowercase for all checks
+      let partnerFound = false;
+
+      // --- NEW: Exclusion Filter ---
+      // Skip files ending in -SOS.pdf, -G.pdf, or *containing* -ddpos
+      if (fileNameLower.endsWith('-sos.pdf') || 
+          fileNameLower.endsWith('-g.pdf') || 
+          fileNameLower.endsWith('-manifest.pdf') || 
+          fileNameLower.includes('-ddpos')) {
+        
+        Logger.log(`- Skipping excluded file: ${fileName}`);
+        continue; // Skips this file entirely
+      }
+
+      // --- NEW: -L (Package) Filter ---
+      // Check if this is a package file *before* matching the partner
+      const isPackageFile = fileNameLower.endsWith('-l.pdf');
+
+
+      // Loop through each partner to find a match
+      for (const partnerName of partnerNames) {
+        const patterns = partnerFilePatterns[partnerName];
+
+        // Loop through this partner's patterns
+        for (const pattern of patterns) {
+          if (fileNameLower.includes(pattern.toLowerCase())) {
+            
+            // --- Match found! ---
+            const pageCount = getNativePageCount(file);
+            
+            if (pageCount > 0) {
+              // --- NEW: Add to the correct report ---
+              if (isPackageFile) {
+                // It's an -L file, add to package count
+                packageReportData[partnerName] += pageCount;
+                grandTotalPackageCount += pageCount;
+                Logger.log(`- Matched [Package]: ${fileName} (${pageCount} pages) to [${partnerName}]`);
+              } else {
+                // It's a regular PO file
+                poReportData[partnerName] += pageCount;
+                grandTotalPoCount += pageCount;
+                Logger.log(`- Matched [PO]: ${fileName} (${pageCount} pages) to [${partnerName}]`);
+              }
+            }
+            
+            partnerFound = true; // Mark as found
+            break; // Stop checking other patterns for this partner
+          }
+        }
+        if (partnerFound) {
+          break; // Stop checking other partners for this file
+        }
+      } // end partner loop
+
+      if (!partnerFound) {
+        Logger.log(`- No match found for file: ${fileName}`);
+      }
+    } // end file loop
+
+    Logger.log('Folder scan complete. Building and sending email...');
+
+    // === Step 3: Build and Send the Email (as HTML) ===
+    // --- NEW: Rebuilt email to match your original format ---
+    const today = new Date().toLocaleDateString('en-US');
+    const emailSubject = `Daily PO & Package Count - ${today}`;
+
+    // Build the email body
+    let emailBodyHtml = `
+      <b>OVERALL TOTALS</b><br>
+      POs: ${grandTotalPoCount}<br>
+      Packs: ${grandTotalPackageCount}<br>
+      <br>
+      <b>OUTLET PO COUNT</b><br>
+    `;
+    
+    // Loop for PO data
+    for (const partnerName of partnerNames) {
+      emailBodyHtml += `${partnerName}: ${poReportData[partnerName] || 0}<br>`;
+    }
+
+    emailBodyHtml += `<br><b>OUTLET PACKAGE COUNT</b><br>`;
+    
+    // Loop for Package data
+    for (const partnerName of partnerNames) {
+      emailBodyHtml += `${partnerName}: ${packageReportData[partnerName] || 0}<br>`;
+    }
+
+    // Send the email
+    MailApp.sendEmail({
+      to: REPORT_EMAIL_ADDRESS,
+      subject: emailSubject,
+      htmlBody: emailBodyHtml
+    });
+
+    Logger.log(`Report successfully sent to ${REPORT_EMAIL_ADDRESS}`);
+
+  } catch (e) {
+    Logger.log(`An error occurred in emailSmartPageCountReport: ${e.toString()}`);
+    try {
+      MailApp.sendEmail({
+        to: REPORT_EMAIL_ADDRESS,
+        subject: `PDF Report FAILED - ${new Date().toLocaleDateString('en-US')}`,
+        body: `The automated smart PDF report failed to run.\n\nError: ${e.toString()}`
+      });
+    } catch (mailError) {
+      Logger.log(`Failed to send error email: ${mailError.toString()}`);
+    }
+  }
+}
+
+// =======================================================
+// =======================================================
 // =======================================================
 // ====== REPORTING FUNCTION (Native Parsing - BOLD TITLES) ======
 // =======================================================
@@ -1420,11 +1640,13 @@ function prepareShippingDocs() {
       const fileName = file.getName(); 
 
       // --- Filter Logic ---
+// --- Filter Logic ---
       const skip1 = fileName.endsWith('-SOS.pdf');
       const skip2 = fileName.endsWith('-L.pdf');
-      const skip3 = skipRegex.test(fileName); 
+      const skip3 = fileName.endsWith('-G.pdf'); 
+      const skip4 = skipRegex.test(fileName);   
       
-      if (skip1 || skip2 || skip3) {
+      if (skip1 || skip2 || skip3 || skip4) {
         Logger.log(`Skipping file (did not meet criteria): ${fileName}`);
         continue; 
       }
@@ -1926,5 +2148,298 @@ function mergeGreenLabels() {
   } catch (e) {
     Logger.log(`An error occurred during merge: ${e.toString()}`);
       if (e.stack) { Logger.log(`Stack Trace: ${e.stack}`); }
+  }
+}
+//==========================================================================
+
+//=================Simple Merger Function===================================
+
+//==========================================================================
+
+/**
+ * FOLDER AND FILE IDs
+ * IDs for the Menards folder merge.
+ */
+const MENARDS_SOURCE_FOLDER_ID = "1NH19Eiq_Kc5uAEmdijSkuNdYIJYClHCU";
+const MENARDS_ARCHIVE_FOLDER_ID = "1V6E4RWNdY3z8-SakL-JuPGsP6u2RaRsE";
+
+/**
+ * Merges all PDFs in the Menards Source folder using the ILOVEPDF API,
+ * saves the merged file back to the Source folder, and moves the
+ * original PDFs to the Archive folder.
+ */
+function menardsPOMerger() { // <-- Renamed this function
+  // --- Define Source, Archive, and Output Name ---
+  const sourceFolder = DriveApp.getFolderById(MENARDS_SOURCE_FOLDER_ID);
+  const archiveFolder = DriveApp.getFolderById(MENARDS_ARCHIVE_FOLDER_ID);
+  
+  // Create a dynamic name for the merged file
+  const outputFileName = 'Merged_Menards_File_' + new Date().toISOString().slice(0, 10) + '.pdf';
+  // --- End Definitions ---
+
+  Logger.log(`Starting PDF Merge function for: ${outputFileName}`);
+
+  // --- Configuration Checks ---
+  if (typeof PROJECT_KEY === 'undefined' || !PROJECT_KEY || PROJECT_KEY === 'YOUR_PROJECT_KEY' || 
+      typeof SECRET_KEY === 'undefined' || !SECRET_KEY || SECRET_KEY === 'YOUR_SECRET_KEY') {
+      Logger.log('ERROR: iLovePDF PROJECT_KEY/SECRET_KEY missing or not set.'); return; 
+  }
+  
+  // --- Get files from source, delete old merged file from source ---
+  
+  // 1. Delete old merged files (if they match the naming pattern)
+  try {
+    const oldMergedFiles = sourceFolder.getFilesByName(outputFileName);
+    while (oldMergedFiles.hasNext()) {
+      const oldFile = oldMergedFiles.next();
+      oldFile.setTrashed(true);
+      Logger.log(`Found and deleted old merged file from source: ${outputFileName}`);
+    }
+  } catch (e) {
+    Logger.log(`Warning: Could not check for/delete old merged file. ${e.message}`);
+  }
+
+  // 2. Get new files from source
+  const allFiles = sourceFolder.getFilesByType(MimeType.PDF);
+  const filesToProcess = [];
+
+  while (allFiles.hasNext()) {
+    const file = allFiles.next();
+    // Don't accidentally re-merge a file we just made
+    if (!file.getName().startsWith('Merged_Menards_File_')) { 
+      filesToProcess.push(file);
+    }
+  }
+  // --- END ---
+
+  // --- Handle 0, 1, or many files ---
+  if (filesToProcess.length === 0) {
+    Logger.log('No new PDF files found in source folder to merge.');
+    return;
+  }
+
+  if (filesToProcess.length === 1) {
+    // --- MODIFIED LOGIC --- 
+    // Just move the single file to the archive. No merge needed.
+    const file = filesToProcess[0];
+    const oldName = file.getName();
+    try {
+      file.moveTo(archiveFolder);
+      Logger.log(`SUCCESS! Only one file found. Moved "${oldName}" to archive. No merge needed.`);
+    } catch (e) {
+      Logger.log(`ERROR: Could not move single file to archive. ${e.message}`);
+    }
+    return; // We are done
+  }
+  // --- END MODIFICATION ---
+
+  // If we get here, we have > 1 file to merge
+  Logger.log(`Found ${filesToProcess.length} files. Starting API merge...`);
+
+  try {
+    // (This assumes getIloveApiToken_() helper function is in your project)
+    const authToken = getIloveApiToken_(); 
+    const headers = { 'Authorization': 'Bearer ' + authToken };
+
+    // === Step 1: Start Merge Task ===
+    Logger.log('Starting merge task...');
+    const startResponse = UrlFetchApp.fetch('https://api.ilovepdf.com/v1/start/merge', {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (startResponse.getResponseCode() !== 200) throw new Error(`Merge Start failed: ${startResponse.getContentText()}`);
+    const startData = JSON.parse(startResponse.getContentText());
+    const server = `https://${startData.server}`;
+    const taskId = startData.task;
+    Logger.log(`Task started with ID: ${taskId}`);
+
+    // === Step 2: Upload Files ===
+    const uploadedFiles = []; 
+    for (const file of filesToProcess) {
+      Logger.log(`Uploading file: ${file.getName()}...`);
+      const uploadResponse = UrlFetchApp.fetch(`${server}/v1/upload`, {
+        method: 'post',
+        headers: headers,
+        payload: { task: taskId, file: file.getBlob() },
+        muteHttpExceptions: true
+      });
+      if (uploadResponse.getResponseCode() !== 200) throw new Error(`Upload failed for ${file.getName()}: ${uploadResponse.getContentText()}`);
+      const uploadData = JSON.parse(uploadResponse.getContentText());
+      uploadedFiles.push({ server_filename: uploadData.server_filename, filename: file.getName() }); 
+      Logger.log(`Upload successful for ${file.getName()}`);
+    }
+
+    // === Step 3: Process the Merge Task ===
+    Logger.log(`Processing the merge for ${uploadedFiles.length} files...`);
+    const processPayload = {
+        task: taskId,
+        tool: 'merge',
+        files: uploadedFiles 
+    };
+
+    const processResponse = UrlFetchApp.fetch(`${server}/v1/process`, {
+      method: 'post',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(processPayload),
+      muteHttpExceptions: true
+    });
+      if (processResponse.getResponseCode() !== 200) {
+        throw new Error(`Merge Process failed: ${processResponse.getContentText()}`);
+      }
+    Logger.log(`Processing successful: ${processResponse.getContentText()}`);
+    
+    // === Step 4: Download the Result ===
+    Logger.log('Downloading the final merged PDF...');
+    const downloadResponse = UrlFetchApp.fetch(`${server}/v1/download/${taskId}`, {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true 
+    });
+
+    if (downloadResponse.getResponseCode() !== 200) {
+      throw new Error(`Download failed: ${downloadResponse.getContentText()}`);
+    }
+    
+    const mergedPdfBlob = downloadResponse.getBlob().setName(outputFileName); 
+    
+    // === Step 5: Save to Google Drive (Source Folder) ===
+    const finalFile = sourceFolder.createFile(mergedPdfBlob);
+    Logger.log(`SUCCESS! File "${outputFileName}" saved to source folder: ${finalFile.getUrl()}`);
+
+    // --- MODIFIED LOGIC --- 
+    // === Step 6: Move original files to archive ===
+    Logger.log(`Moving ${filesToProcess.length} original files to archive...`);
+    let movedCount = 0;
+    for (const file of filesToProcess) {
+      try {
+        file.moveTo(archiveFolder);
+        movedCount++;
+      } catch (e) {
+        Logger.log(`Warning: Could not move file ${file.getName()} to archive. ${e.message}`);
+      }
+    }
+    Logger.log(`✅ Merge complete. ${movedCount} original files moved to archive.`);
+
+  } catch (e) {
+    Logger.log(`An error occurred during merge: ${e.toString()}`);
+  }
+}
+
+function getIloveApiToken_() {
+  const cache = CacheService.getScriptCache();
+  let token = cache.get('ilovepdf_token');
+  
+  if (token) {
+    Logger.log('Using cached API token.');
+    return token;
+  }
+
+  Logger.log('No cached token. Requesting new API token...');
+  const url = 'https://api.ilovepdf.com/v1/auth';
+  const payload = {
+    public_key: PROJECT_KEY,
+    secret_key: SECRET_KEY
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      const data = JSON.parse(responseBody);
+      token = data.token;
+      // Cache for 50 minutes (token expires in 60)
+      cache.put('ilovepdf_token', token, 3000); 
+      Logger.log('Successfully retrieved new API token.');
+      return token;
+    } else {
+      Logger.log(`Error getting token (HTTP ${responseCode}): ${responseBody}`);
+      throw new Error(`Failed to authenticate with iLovePDF. Response: ${responseBody}`);
+    }
+  } catch (e) {
+    Logger.log(`Exception during authentication: ${e.message}`);
+    throw e;
+  }
+}
+
+
+/**
+ * Finds all PDFs in a specific Google Drive folder and sends them
+ * as attachments to a pre-defined email address.
+ */
+function sendPdfsFromFolder() {
+  // --- START: YOUR DETAILS ---
+  
+  // 1. Recipient's email address
+  var recipient = "joe@digdefence.com";
+  
+  // 2. The ID of the Google Drive folder.
+  // Extracted from your URL: https://drive.google.com/drive/folders/148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK
+  var folderId = "148LZNOxM1T5dojvNj5Zi7Y4zbsmZUDwK";
+  
+  // 3. Get today's date, formatted as MM/DD/YYYY
+  var todaysDate = new Date().toLocaleDateString(); 
+  
+  // 4. Set the email subject
+  var subject = "#DIG DEFENCE POs for " + todaysDate;
+  
+  // 5. Set the email body (change this as needed)
+  var body = "Attention Dig Defence Crowder Crew. We ship via a UPS account with competitive carrier rates for our small parcel packs that we ship out. Please note that some orders going to customers will have UPS and FedEx shipping labels depending on shipping rates. Please text or email Rod or Joe if you have any questions." + 
+             "\n\n" + 
+             "Thank you,";
+             
+  // --- END: YOUR DETAILS ---
+
+  try {
+    // Get the folder from Google Drive
+    var folder = DriveApp.getFolderById(folderId);
+    
+    // Find all files in that folder that are PDFs
+    var pdfFiles = folder.getFilesByType(MimeType.PDF);
+    
+    var attachments = [];
+    var fileNames = []; // To list files in the email body for confirmation
+
+    // Loop through all the PDFs found
+    while (pdfFiles.hasNext()) {
+      var file = pdfFiles.next();
+      attachments.push(file.getBlob());
+      fileNames.push(file.getName());
+    }
+
+    // Check if we actually found any PDFs before sending
+    if (attachments.length > 0) {
+      // Add the list of files to the email body
+      var fullBody = body + 
+                     "\n\n" + 
+                     "Files Attached (" + attachments.length + "):" +
+                     "\n- " + fileNames.join("\n- ");
+
+      // Send the email
+      GmailApp.sendEmail(recipient, subject, fullBody, {
+        attachments: attachments 
+      });
+      
+      // Log success for the script editor
+      Logger.log("Email sent successfully to " + recipient + " with " + attachments.length + " PDFs.");
+      
+    } else {
+      // If no PDFs were found, log it and don't send an email
+      Logger.log("No PDF files were found in the folder: " + folder.getName());
+    }
+
+  } catch (e) {
+    // Log any errors that occur
+    Logger.log("Error: " + e.message);
   }
 }
