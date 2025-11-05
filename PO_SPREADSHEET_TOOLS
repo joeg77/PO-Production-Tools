@@ -859,3 +859,351 @@ function purgeFiles() {
   });
   SpreadsheetApp.getUi().alert(`✅ Purge complete. Total files deleted: ${totalDeleted}`);
 }
+
+// =============================================================
+// ============ GEMINI MANUAL ORDER EXTRACTION =================
+// =============================================================
+
+// =============================================================
+// ============ GEMINI MANUAL ORDER EXTRACTION =================
+// =============================================================
+
+// 1. --- GEMINI CONFIGURATION ---
+//    (This is safely renamed to avoid conflicts)
+// ---------------------------------
+const CONFIG_GEMINI = {
+  // This is the ID from your existing PO script
+  SHEET_ID: '18S8eTH-OLVJwJSS7fZo6UD6Ut2TAtSSMDCFtHxDZahY', 
+  
+  // This points to your MAIN "Sheet1"
+  SHEET_NAME: 'Sheet1', 
+  
+  // The Gmail label you will apply to new orders
+  GMAIL_LABEL_NEW: 'Sales/Manual Orders',
+  
+  // The label applied after an order is successfully processed
+  GMAIL_LABEL_PROCESSED: 'Sales/Manual Orders Processed',
+  
+  // Your Gemini API Key (https://aistudio.google.com/app/apikey)
+  GEMINI_API_KEY: 'AIzaSyDQ0lYUcCT2VgU1XnAt_L1ipRTVMp6bm10' // <--- PUT YOUR KEY HERE
+};
+
+// =============================================================
+// ============ PASTE THIS ENTIRE BLOCK ========================
+// =============================================================
+
+
+// =============================================================
+// ============ (REPLACE THIS FUNCTION) ========================
+// =============================================================
+
+// =============================================================
+// ============ (REPLACE THIS FUNCTION - FINAL) ================
+// =============================================================
+
+// =============================================================
+// ============ (REPLACE THIS FUNCTION - FINAL) ================
+// =============================================================
+
+// =============================================================
+// ============ (REPLACE THIS FUNCTION - FINAL, FAST) ==========
+// =============================================================
+
+// ---------------------------------
+// 2. --- MAIN FUNCTION ---
+//    (This is FAST and SMART)
+// ---------------------------------
+function processNewOrders() {
+  const newLabel = GmailApp.getUserLabelByName(CONFIG_GEMINI.GMAIL_LABEL_NEW);
+  const processedLabel = GmailApp.getUserLabelByName(CONFIG_GEMINI.GMAIL_LABEL_PROCESSED);
+  
+  if (!newLabel) {
+    Logger.log(`Error: Gmail label "${CONFIG_GEMINI.GMAIL_LABEL_NEW}" not found.`);
+    return;
+  }
+  if (!processedLabel) {
+    Logger.log(`Error: Gmail label "${CONFIG_GEMINI.GMAIL_LABEL_PROCESSED}" not found. Please create it.`);
+    return;
+  }
+
+  const threads = newLabel.getThreads();
+  if (threads.length === 0) {
+    Logger.log('No new orders to process.');
+    SpreadsheetApp.getUi().alert('No new manual orders found with that label.');
+    return;
+  }
+
+  Logger.log(`Found ${threads.length} order(s) to process...`);
+  SpreadsheetApp.getUi().alert(`Found ${threads.length} order(s). Processing...`);
+
+  for (const thread of threads) {
+    try {
+      // --- THIS IS THE NEW, FAST & SMART LOGIC ---
+      
+      // 1. Get ALL message headers for the thread in ONE fast call.
+      const threadDetails = Gmail.Users.Threads.get('me', thread.getId(), {
+        format: 'metadata',
+        metadataHeaders: ['From']
+      });
+      
+      const messages = threadDetails.messages;
+      if (!messages || messages.length === 0) {
+        Logger.log('Skipping thread: No messages found.');
+        continue;
+      }
+
+      // 2. Find the *first* message from Kent (this loop is now in-memory, NOT an API call)
+      let targetMessageId = null;
+      for (const message of messages) {
+        const fromHeader = message.payload.headers.find(h => h.name === 'From');
+        
+        // --- THIS IS THE LINE YOU ASKED ABOUT ---
+        if (fromHeader && fromHeader.value.includes('kent@digdefence.com')) {
+          targetMessageId = message.id;
+          Logger.log(`Found target email from Kent: ${message.id}`);
+          break; // Stop at the first match
+        }
+        // --- END OF LINE ---
+      }
+
+      // 3. If no email from Kent is found, fall back to the very first email in the thread.
+      if (!targetMessageId) {
+        targetMessageId = messages[0].id; // messages[0] is the *oldest* email
+        Logger.log(`No email from Kent found. Falling back to first email in thread: ${targetMessageId}`);
+      }
+      
+      // 4. Now, get the *plain text body* for ONLY that one message.
+      const emailBody = getMessageBody(targetMessageId); // Uses your helper function
+      // --- END OF NEW LOGIC ---
+
+      Logger.log(`Extracted text: "${emailBody.substring(0, 100)}..."`); // Log a snippet
+
+      // Check if the email body is empty
+      if (!emailBody || emailBody.trim() === "") {
+        Logger.log(`Skipping email: ${thread.getFirstMessageSubject()}. No text content found.`);
+        thread.removeLabel(newLabel);
+        thread.addLabel(processedLabel);
+        Logger.log('Marked as processed (empty).');
+        continue; 
+      }
+      
+      Logger.log(`Processing email with subject: ${thread.getFirstMessageSubject()}`);
+      
+      const orderData = callGeminiAPI(emailBody); 
+      
+      if (orderData) {
+        Logger.log('Successfully parsed order data from AI.');
+        writeDataToSheet_Gemini(orderData); 
+        
+        thread.removeLabel(newLabel);
+        thread.addLabel(processedLabel);
+        Logger.log('Successfully processed and written to sheet.');
+      } else {
+        Logger.log('Error: Could not get valid data from Gemini API.');
+      }
+
+    } catch (e) {
+      Logger.log(`Error processing thread: ${e}`);
+      Logger.log(e.stack); // Log the full error
+    }
+  }
+  SpreadsheetApp.getUi().alert(`✅ Processing complete. Check logs for details.`);
+}
+
+/**
+ * Helper function to get the plain text body of a message.
+ * This is needed for the advanced Gmail service.
+ */
+// =============================================================
+// ============ (REPLACE THIS HELPER FUNCTION) =================
+// =============================================================
+
+/**
+ * Helper function to get the plain text body of a message.
+ * This is the new, robust version.
+ */
+function getMessageBody(messageId) {
+  try {
+    // Use the SIMPLE Gmail service to get the message by its ID.
+    // This is the most reliable way and handles all decoding automatically.
+    const message = GmailApp.getMessageById(messageId);
+    return message.getPlainBody();
+  } catch (e) {
+    Logger.log('Error in getMessageBody: ' + e);
+    return '';
+  }
+}
+// =============================================================
+// ============ (REPLACE THIS FUNCTION - FINAL MODEL) ==========
+// =============================================================
+
+// =============================================================
+// ============ (REPLACE THIS FUNCTION - 1.0 MODEL) ==========
+// =============================================================
+
+// ---------------------------------
+// 3. --- GEMINI API FUNCTION ---
+//    (This uses the gemini-1.0-pro model)
+// ---------------------------------
+function callGeminiAPI(emailBody) {
+  // This is the complete prompt we designed together
+  const systemPrompt = `
+You are an automated order data extractor. You will be given an email body. Your task is to extract all shipping and order details.
+
+CRITICAL: The order may have multiple items. You MUST return a JSON object where the "items" key is an array of objects, one for each line item. All other details (like address and name) should be at the top level.
+
+Mappings & Rules:
+* "customerName": The person's name to ship to (e.g., "Gary Gilbert").
+* "companyName": The company name (e.g., "Cincinnati Zoo & Botanical Garden").
+* "companyNameShort": The company name, truncated to 30 characters.
+* "address1": Street address.
+* "address2": null if not present.
+* "address3": null if not present.
+* "city": City name.
+* "state": 2-letter state code.
+* "zip": Zip code.
+* "phone": Digits only. Use 'O:' (Office) number if available.
+* "poAbbreviation": Create a 3-6 letter abbreviation from the company name (e.g., "CIN-ZOO").
+* "items" (Array):
+    * "sku": The item SKU.
+    * "quantity": The item quantity.
+    * "weight": The *total weight for that line item* (item_weight * quantity).
+
+Default Values (Return these in the JSON):
+* "country": "US"
+* "serviceType": "UNSP"
+* "residential": "Y"
+* "source": "UOL"
+* "merchantID": "misc"
+
+SKU & Weight Logic (Use these mappings):
+* **SPECIAL RULE:** "50 Pack of DDAC" -> SKU: "DDAC-10", Quantity: 5, Weight: 345 (5 * 69)
+* "Dig Defence Animal Control 10PK": "DDAC-10", 69 lbs
+* "DDAC Installation Tool": "DDAC-TOOL", 20 lbs
+* "SM/MD Animal Barrier 4PK": "DDF2-4", 9 lbs
+* "SM/MD Animal Barrier 10PK": "DDF2-10", 20 lbs
+* "SM/MD Animal Barrier 25PK": "DDF2-25", 49 lbs
+* "Dig Defence 10-pack Small/Medium Animal Barrier - BLACK": "DDF2-10BL", 20 lbs
+* "Dig Defence 25-pack Small/Medium Animal Barrier - BLACK": "DDF2-25BL", 49 lbs
+* "LG Animal Barrier 4PK": "DDF3-4", 9 lbs
+* "LG Animal Barrier 10PK": "DDF3-10", 21 lbs
+* "LG Animal Barrier 25PK": "DDF3-25", 50 lbs
+* "XL Animal Barrier 2PK": "XL-2", 8 lbs
+* "XL Animal Barrier 5PK": "XL-5", 18 lbs
+* "XL Animal Barrier 15PK": "XL-15", 53 lbs
+
+---
+Here is the email to process:
+---
+`;
+
+  // --- THIS IS THE FIX ---
+  // We are now using the "gemini-1.0-pro" model
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${CONFIG_GEMINI.GEMINI_API_KEY}`;
+  
+  // The payload structure is the same as gemini-pro, so this is correct.
+  const payload = {
+    "contents": [
+      {
+        "role": "user", 
+        "parts": [ 
+          { "text": systemPrompt + "\n" + emailBody } 
+        ]
+      }
+    ],
+    "generationConfig": {
+      "responseMimeType": "application/json",
+    }
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true 
+  };
+
+  let responseText = ''; 
+  try {
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    responseText = response.getContentText(); 
+    
+    if (response.getResponseCode() !== 200) {
+       Logger.log(`API Error: Received HTTP ${response.getResponseCode()}. Response: ${responseText}`);
+       return null; 
+    }
+
+    const jsonResponse = JSON.parse(responseText);
+
+    if (!jsonResponse.candidates || jsonResponse.candidates.length === 0) {
+      Logger.log(`API Error: Response received, but no "candidates" found. Full response: ${responseText}`);
+      return null; 
+    }
+    
+    const aiContent = jsonResponse.candidates[0].content.parts[0].text;
+    Logger.log(`AI Raw Output: ${aiContent}`); 
+    
+    const parsedData = JSON.parse(aiContent);
+
+    if (!parsedData.poAbbreviation || !parsedData.items) {
+      Logger.log(`Data Mismatch Error: AI returned JSON, but it's missing required fields (like poAbbreviation or items).`);
+      Logger.log(`Parsed Data: ${JSON.stringify(parsedData)}`);
+      return null; 
+    }
+    
+    return parsedData; // Success
+    
+  } catch (e) {
+    Logger.log(`Critical API Call Error: ${e}`);
+    Logger.log(`Raw Response Text (if available): ${responseText}`);
+    return null; 
+  }
+}
+// ---------------------------------
+// 4. --- GOOGLE SHEET FUNCTION ---
+//    (I've named this writeDataToSheet_Gemini to be safe)
+// ---------------------------------
+function writeDataToSheet_Gemini(data) {
+  // This uses the renamed CONFIG_GEMINI variable
+  const sheet = SpreadsheetApp.openById(CONFIG_GEMINI.SHEET_ID).getSheetByName(CONFIG_GEMINI.SHEET_NAME);
+  
+  const timeZone = Session.getScriptTimeZone();
+  const dateString = Utilities.formatDate(new Date(), timeZone, "yyyy-MM-dd");
+  
+  // A: Create the PO Number
+  const poNumber = `${dateString}-${data.poAbbreviation}`;
+  
+  // L: Calculate the *total* order weight
+  const totalWeight = data.items.reduce((sum, item) => sum + (item.weight || 0), 0);
+
+  // Loop through each item in the order and add a row
+  for (const item of data.items) {
+    const row = [
+      poNumber,                // A: PO Number
+      data.customerName,       // B: Person's Name
+      data.address1,           // C: Address 1
+      data.address2,           // D: Address 2
+      data.address3,           // E: Address 3
+      data.city,               // F: City
+      data.state,              // G: State
+      data.zip,                // H: Zip Code
+      data.country,            // I: "US"
+      data.phone,              // J: Telephone
+      data.serviceType,        // K: "UNSP"
+      totalWeight,             // L: Package Weight (Total for order)
+      item.sku,                // M: SKU
+      poNumber,                // N: PO Number (Again)
+      null,                    // O: Null
+      null,                    // P: Null
+      item.quantity,           // Q: Qty
+      data.residential,        // R: "Y"
+      data.source,             // S: "UOL"
+      data.customerName,       // T: Customer Name (Again)
+      data.companyNameShort,   // U: Company Name Short
+      data.merchantID          // V: "misc"
+    ];
+    
+    // Add this item as a new row in the sheet
+    sheet.appendRow(row);
+  }
+}
