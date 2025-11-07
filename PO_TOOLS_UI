@@ -175,6 +175,7 @@
             <button class="remote-btn pdf" onclick="runFunction('renameShippingLabels')">Rename Shipping Labels</button>
             <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFs')">Rename Shipping Manifests</button>
             <button class="remote-btn pdf" onclick="runFunction('renameFileToPDF')">Rename Files With No Extension to PDF</button>
+            <button class="remote-btn pdf" onclick="runFunction('simpleMerge')">Simple Merger</button>
           </div>
         </details>
 
@@ -185,8 +186,7 @@
               <summary>Renaming (-thurs)</summary>
               <div class="panel">
                 <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFilesThurs')">Rename Trading Partner Packing Slips (-thurs)</button>
-                <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsThurs')">Rename Shipping Labels (-thurs)</button>
-                <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFsThurs')">Rename Shipping Manifests (-thurs)</button>
+                <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsThurs')">Rename Shipping Labels (-thurs)</button>                
               </div>
             </details>
           </div>
@@ -199,8 +199,7 @@
               <summary>Renaming (-sun)</summary>
               <div class="panel">
                 <button class="remote-btn pdf" onclick="runFunction('renameTradingPartnerFilesSun')">Rename Trading Partner Packing Slips (-sun)</button>
-                <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsSun')">Rename Shipping Labels (-sun)</button>
-                <button class="remote-btn pdf" onclick="runFunction('renameShippingManifestPDFsSun')">Rename Shipping Manifests (-sun)</button>
+                <button class="remote-btn pdf" onclick="runFunction('renameShippingLabelsSun')">Rename Shipping Labels (-sun)</button>                
               </div>
             </details>
           </div>
@@ -226,9 +225,10 @@
         <details>
           <summary>Prepping</summary>
           <div class="panel">
-            <button class="remote-btn pdf" onclick="runFunction('emailSmartPageCountReport')">Generate Pack Count</button>
+            <button class="remote-btn pdf" onclick="runFunction('simpleMerge')">Simple Merger</button>
             <button class="remote-btn pdf" onclick="runFunction('mergeManifests')">Merge Manifests</button>
             <button class="remote-btn pdf" onclick="runFunction('moveShippingDocuments')">Move Shipping Documents To Email Folder</button>
+            <button class="remote-btn pdf" onclick="runFunction('emailSmartPageCountReport')">Generate Pack Count</button>
             <button class="remote-btn emailprep" onclick="runFunction('prepareShippingDocs')">Run Email Prep</button>
             <button class="remote-btn emailprep" onclick="runFunction('sendPdfsFromFolder')">Attach Files And Email</button>
           </div>
