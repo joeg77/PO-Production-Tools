@@ -29,8 +29,6 @@ const MENARDS_SHIPPING_CONFIG = {
   // ... any other properties you have ...
 };
 
-
-
 // --- Trading Partner Source Folders ---
 const tradingPartners = [
   { id: "1ovwLcs_YV2lSjFaYHBPMHo8PIW-_MlnK", filename: "document-PS-amazon" },
@@ -175,33 +173,355 @@ const labelPartnerNameMap = {
 // ====== END OF CONFIGURATION ======
 // =======================================================
 
-// (Your original functions like renameTradingPartnerFiles, etc., should start below here)
+// === CONFIGURATION ===
+// The ID of your "holding" folder where original, merged files will be moved.
+const PDF_HOLDING_FOLDER_ID = "1kMWeojmeojSKTwrs23w1Pl2mkTmi7Xnf";
 
-
-
-// ======= Trading Partner PDF Renaming =======
+// ======= Trading Partner PDF Renaming (UPDATED) =======
 function renameTradingPartnerFiles() {
-  let totalFiles = 0;
+  let totalFilesRenamed = 0;
+  let totalFilesMerged = 0;
+  const holdingFolder = DriveApp.getFolderById(PDF_HOLDING_FOLDER_ID);
+
   tradingPartners.forEach(partner => {
     try {
-      Logger.log(`Renaming files in folder ${partner.id}`);
+      Logger.log(`Processing files in folder ${partner.id}`);
       const folder = DriveApp.getFolderById(partner.id);
       const files = folder.getFilesByType(MimeType.PDF);
-      let index = 1;
+
+      // Collect files into an array to count them
+      const fileArray = [];
       while (files.hasNext()) {
-        const file = files.next();
-        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}.pdf`);
-        index++;
-        totalFiles++;
+        fileArray.push(files.next());
       }
-      Logger.log(`Renamed ${index - 1} files in folder ${partner.id}`);
+      const fileCount = fileArray.length;
+
+      if (fileCount === 0) {
+        Logger.log(`No files found in folder ${partner.id}`);
+        return; // Skip to the next partner
+      }
+
+      // --- NEW LOGIC ---
+      const outputFileName = `${partner.filename}.pdf`;
+
+      if (fileCount === 1) {
+        // --- Single File: Just rename ---
+        const file = fileArray[0];
+        file.setName(outputFileName);
+        Logger.log(`Renamed 1 file to ${outputFileName} in folder ${partner.id}`);
+        totalFilesRenamed++;
+      } else {
+        // --- Multiple Files: Merge using iLovePDF ---
+        Logger.log(`Found ${fileCount} files. Calling iLovePDF merge...`);
+        
+        // Call the API helper to merge files and save in the same folder
+        const mergedFile = mergePdfsWithIloveApi_(fileArray, outputFileName, folder);
+
+        if (mergedFile) {
+          Logger.log(`Merge successful. New file: ${mergedFile.getName()}`);
+          totalFilesMerged += fileCount;
+
+          // Move original files to the holding folder
+          fileArray.forEach(originalFile => {
+            try {
+              originalFile.moveTo(holdingFolder);
+            } catch (moveErr) {
+              Logger.log(`Warning: Could not move original file ${originalFile.getName()}. ${moveErr}`);
+            }
+          });
+        } else {
+          Logger.log(`ERROR: Merge failed for files in folder ${partner.id}`);
+        }
+      }
     } catch (e) {
-      Logger.log(`Error renaming in folder ${partner.id}: ${e.message}`);
+      Logger.log(`Error processing folder ${partner.id}: ${e.message}`);
     }
   });
-  return `✅ Renamed ${totalFiles} trading partner PDFs`;
+
+  return `✅ Renamed ${totalFilesRenamed} single files and merged ${totalFilesMerged} files.`;
 }
 
+// ======= Trading Partner PDF Renaming (Thursday - UPDATED) =======
+function renameTradingPartnerFilesThurs() {
+  let totalFilesRenamed = 0;
+  let totalFilesMerged = 0;
+  const holdingFolder = DriveApp.getFolderById(PDF_HOLDING_FOLDER_ID);
+
+  tradingPartners.forEach(partner => {
+    try {
+      Logger.log(`Processing Thursday files in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+
+      const fileArray = [];
+      while (files.hasNext()) {
+        fileArray.push(files.next());
+      }
+      const fileCount = fileArray.length;
+
+      if (fileCount === 0) {
+        Logger.log(`No Thursday files found in folder ${partner.id}`);
+        return;
+      }
+
+      // --- NEW LOGIC ---
+      const outputFileName = `${partner.filename}-thurs.pdf`; // Added suffix
+
+      if (fileCount === 1) {
+        // --- Single File: Just rename ---
+        const file = fileArray[0];
+        file.setName(outputFileName);
+        Logger.log(`Renamed 1 file to ${outputFileName} in folder ${partner.id}`);
+        totalFilesRenamed++;
+      } else {
+        // --- Multiple Files: Merge using iLovePDF ---
+        Logger.log(`Found ${fileCount} files. Calling iLovePDF merge...`);
+        
+        const mergedFile = mergePdfsWithIloveApi_(fileArray, outputFileName, folder);
+
+        if (mergedFile) {
+          Logger.log(`Merge successful. New file: ${mergedFile.getName()}`);
+          totalFilesMerged += fileCount;
+
+          // Move original files to the holding folder
+          fileArray.forEach(originalFile => {
+            try {
+              originalFile.moveTo(holdingFolder);
+            } catch (moveErr) {
+              Logger.log(`Warning: Could not move original file ${originalFile.getName()}. ${moveErr}`);
+            }
+          });
+        } else {
+          Logger.log(`ERROR: Merge failed for files in folder ${partner.id}`);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error processing Thursday folder ${partner.id}: ${e.message}`);
+    }
+  });
+
+  return `✅ Renamed ${totalFilesRenamed} single files and merged ${totalFilesMerged} Thursday files.`;
+}
+
+// ======= Trading Partner PDF Renaming (Sunday - UPDATED) =======
+function renameTradingPartnerFilesSun() {
+  let totalFilesRenamed = 0;
+  let totalFilesMerged = 0;
+  const holdingFolder = DriveApp.getFolderById(PDF_HOLDING_FOLDER_ID);
+
+  tradingPartners.forEach(partner => {
+    try {
+      Logger.log(`Processing Sunday files in folder ${partner.id}`);
+      const folder = DriveApp.getFolderById(partner.id);
+      const files = folder.getFilesByType(MimeType.PDF);
+
+      const fileArray = [];
+      while (files.hasNext()) {
+        fileArray.push(files.next());
+      }
+      const fileCount = fileArray.length;
+
+      if (fileCount === 0) {
+        Logger.log(`No Sunday files found in folder ${partner.id}`);
+        return;
+      }
+
+      // --- NEW LOGIC ---
+      const outputFileName = `${partner.filename}-sun.pdf`; // Added suffix
+
+      if (fileCount === 1) {
+        // --- Single File: Just rename ---
+        const file = fileArray[0];
+        file.setName(outputFileName);
+        Logger.log(`Renamed 1 file to ${outputFileName} in folder ${partner.id}`);
+        totalFilesRenamed++;
+      } else {
+        // --- Multiple Files: Merge using iLovePDF ---
+        Logger.log(`Found ${fileCount} files. Calling iLovePDF merge...`);
+        
+        const mergedFile = mergePdfsWithIloveApi_(fileArray, outputFileName, folder);
+
+        if (mergedFile) {
+          Logger.log(`Merge successful. New file: ${mergedFile.getName()}`);
+          totalFilesMerged += fileCount;
+
+          // Move original files to the holding folder
+          fileArray.forEach(originalFile => {
+            try {
+              originalFile.moveTo(holdingFolder);
+            } catch (moveErr) {
+              Logger.log(`Warning: Could not move original file ${originalFile.getName()}. ${moveErr}`);
+            }
+          });
+        } else {
+          Logger.log(`ERROR: Merge failed for files in folder ${partner.id}`);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error processing Sunday folder ${partner.id}: ${e.message}`);
+    }
+  });
+
+  return `✅ Renamed ${totalFilesRenamed} single files and merged ${totalFilesMerged} Sunday files.`;
+}
+
+
+// ==================================================================
+//               NEW HELPER FUNCTIONS (ADD THESE)
+// ==================================================================
+
+/**
+ * Merges multiple PDF files using the iLovePDF API.
+ * This is an adapted version of your 'simpleMerge' function.
+ *
+ * @param {GoogleAppsScript.Drive.File[]} filesToProcess - An array of File objects to merge.
+ *a* @param {string} outputFileName - The final name for the merged PDF.
+ * @param {GoogleAppsScript.Drive.Folder} outputFolder - The Drive Folder to save the file in.
+ * @returns {GoogleAppsScript.Drive.File | null} The new merged File object, or null on failure.
+ */
+function mergePdfsWithIloveApi_(filesToProcess, outputFileName, outputFolder) {
+  Logger.log(`Starting iLovePDF API merge for: ${outputFileName}`);
+
+  // --- Configuration Check ---
+  if (typeof PROJECT_KEY === 'undefined' || !PROJECT_KEY || PROJECT_KEY === 'YOUR_PROJECT_KEY' ||
+    typeof SECRET_KEY === 'undefined' || !SECRET_KEY || SECRET_KEY === 'YOUR_SECRET_KEY') {
+    Logger.log('ERROR: iLovePDF PROJECT_KEY/SECRET_KEY missing. Please set them at the top of the script.');
+    return null;
+  }
+
+  // --- Delete old merged file (if it exists) ---
+  try {
+    const oldMergedFiles = outputFolder.getFilesByName(outputFileName);
+    while (oldMergedFiles.hasNext()) {
+      oldMergedFiles.next().setTrashed(true);
+      Logger.log(`Found and deleted old merged file: ${outputFileName}`);
+    }
+  } catch (e) {
+    Logger.log(`Warning: Could not check for/delete old merged file. ${e.message}`);
+  }
+
+  try {
+    const authToken = getIloveApiToken_();
+    const headers = { 'Authorization': 'Bearer ' + authToken };
+
+    // === Step 1: Start Merge Task ===
+    Logger.log('Starting merge task...');
+    const startResponse = UrlFetchApp.fetch('https://api.ilovepdf.com/v1/start/merge', {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (startResponse.getResponseCode() !== 200) throw new Error(`Merge Start failed: ${startResponse.getContentText()}`);
+    const startData = JSON.parse(startResponse.getContentText());
+    const server = `https://${startData.server}`;
+    const taskId = startData.task;
+    Logger.log(`Task started with ID: ${taskId}`);
+
+    // === Step 2: Upload Files ===
+    const uploadedFiles = [];
+    for (const file of filesToProcess) {
+      Logger.log(`Uploading file: ${file.getName()}...`);
+      const uploadResponse = UrlFetchApp.fetch(`${server}/v1/upload`, {
+        method: 'post',
+        headers: headers,
+        payload: { task: taskId, file: file.getBlob() },
+        muteHttpExceptions: true
+      });
+      if (uploadResponse.getResponseCode() !== 200) throw new Error(`Upload failed for ${file.getName()}: ${uploadResponse.getContentText()}`);
+      const uploadData = JSON.parse(uploadResponse.getContentText());
+      uploadedFiles.push({ server_filename: uploadData.server_filename, filename: file.getName() });
+    }
+    Logger.log(`Uploaded ${uploadedFiles.length} files.`);
+
+    // === Step 3: Process the Merge Task ===
+    Logger.log('Processing the merge...');
+    const processPayload = {
+      task: taskId,
+      tool: 'merge',
+      files: uploadedFiles
+    };
+    const processResponse = UrlFetchApp.fetch(`${server}/v1/process`, {
+      method: 'post',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(processPayload),
+      muteHttpExceptions: true
+    });
+    if (processResponse.getResponseCode() !== 200) throw new Error(`Merge Process failed: ${processResponse.getContentText()}`);
+    Logger.log(`Processing successful.`);
+
+    // === Step 4: Download the Result ===
+    Logger.log('Downloading the final merged PDF...');
+    const downloadResponse = UrlFetchApp.fetch(`${server}/v1/download/${taskId}`, {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (downloadResponse.getResponseCode() !== 200) throw new Error(`Download failed: ${downloadResponse.getContentText()}`);
+
+    const mergedPdfBlob = downloadResponse.getBlob().setName(outputFileName);
+
+    // === Step 5: Save to Google Drive ===
+    const finalFile = outputFolder.createFile(mergedPdfBlob);
+    Logger.log(`SUCCESS! File "${outputFileName}" saved to folder: ${finalFile.getUrl()}`);
+    
+    return finalFile; // Return the new file object
+
+  } catch (e) {
+    Logger.log(`An error occurred during merge: ${e.toString()}`);
+    return null; // Return null on failure
+  }
+}
+
+
+/**
+ * Helper function to get a cached iLovePDF API token.
+ * (This is the same function you provided)
+ */
+function getIloveApiToken_() {
+  const cache = CacheService.getScriptCache();
+  let token = cache.get('ilovepdf_token');
+  
+  if (token) {
+    // Logger.log('Using cached API token.'); // Can be noisy, comment out if not needed
+    return token;
+  }
+
+  Logger.log('No cached token. Requesting new API token...');
+  const url = 'https://api.ilovepdf.com/v1/auth';
+  const payload = {
+    public_key: PROJECT_KEY,
+    secret_key: SECRET_KEY
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      const data = JSON.parse(responseBody);
+      token = data.token;
+      // Cache for 50 minutes (token expires in 60)
+      cache.put('ilovepdf_token', token, 3000); 
+      Logger.log('Successfully retrieved new API token.');
+      return token;
+    } else {
+      Logger.log(`Error getting token (HTTP ${responseCode}): ${responseBody}`);
+      throw new Error(`Failed to authenticate with iLovePDF. Response: ${responseBody}`);
+    }
+  } catch (e) {
+    Logger.log(`Exception during authentication: ${e.message}`);
+    throw e;
+  }
+}
 // ======= Shipping Labels Renaming =======
 function renameShippingLabels() {
   let totalFiles = 0;
@@ -224,29 +544,6 @@ function renameShippingLabels() {
   });
   return `✅ Renamed ${totalFiles} shipping label PDFs`;
 }
-// ======= Trading Partner PDF Renaming (Thursday) =======
-function renameTradingPartnerFilesThurs() {
-  let totalFiles = 0;
-  tradingPartners.forEach(partner => {
-    try {
-      Logger.log(`Renaming Thursday files in folder ${partner.id}`);
-      const folder = DriveApp.getFolderById(partner.id);
-      const files = folder.getFilesByType(MimeType.PDF);
-      let index = 1;
-      while (files.hasNext()) {
-        const file = files.next();
-        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}-thurs.pdf`);
-        index++;
-        totalFiles++;
-      }
-      Logger.log(`Renamed ${index - 1} Thursday files in folder ${partner.id}`);
-    } catch (e) {
-      Logger.log(`Error renaming Thursday files in folder ${partner.id}: ${e.message}`);
-    }
-  });
-  return `✅ Renamed ${totalFiles} trading partner PDFs with -thurs suffix`;
-}
-
 // ======= Shipping Labels Renaming (Thursday) =======
 function renameShippingLabelsThurs() {
   let totalFiles = 0;
@@ -271,30 +568,6 @@ function renameShippingLabelsThurs() {
   });
   return `✅ Renamed ${totalFiles} shipping label PDFs with -thurs-L suffix`;
 }
-
-// ======= Trading Partner PDF Renaming (Sunday) =======
-function renameTradingPartnerFilesSun() {
-  let totalFiles = 0;
-  tradingPartners.forEach(partner => {
-    try {
-      Logger.log(`Renaming Sunday files in folder ${partner.id}`);
-      const folder = DriveApp.getFolderById(partner.id);
-      const files = folder.getFilesByType(MimeType.PDF);
-      let index = 1;
-      while (files.hasNext()) {
-        const file = files.next();
-        file.setName(`${partner.filename}${index > 1 ? `-${index}` : ''}-sun.pdf`);
-        index++;
-        totalFiles++;
-      }
-      Logger.log(`Renamed ${index - 1} Sunday files in folder ${partner.id}`);
-    } catch (e) {
-      Logger.log(`Error renaming Sunday files in folder ${partner.id}: ${e.message}`);
-    }
-  });
-  return `✅ Renamed ${totalFiles} trading partner PDFs with -sun suffix`;
-}
-
 // ======= Shipping Labels Renaming (Sunday) =======
 function renameShippingLabelsSun() {
   let totalFiles = 0;
@@ -319,14 +592,6 @@ function renameShippingLabelsSun() {
   });
   return `✅ Renamed ${totalFiles} shipping label PDFs with -sun-L suffix`;
 }
-
-
-
-
-
-
-
-
 // ======= Shipping Manifests Renaming =======
 function renameShippingManifestPDFs() {
   let totalFiles = 0;
@@ -349,7 +614,6 @@ function renameShippingManifestPDFs() {
   });
   return `✅ Renamed ${totalFiles} shipping manifest PDFs`;
 }
-
 // ======= Rename File Ext =======
 function renameFileToPDF() {
   // Collect all relevant folder IDs
@@ -389,7 +653,6 @@ function renameFileToPDF() {
 
   return `✅ Renamed ${totalRenamed} file(s) to add .pdf extension`;
 }
-
 // ======= Copy Trading Partner PDFs =======
 function copyTradingPartnerPDFs() {
   let totalFiles = 0;
@@ -419,7 +682,6 @@ function copyTradingPartnerPDFs() {
     return `⚠️ Failed to copy trading partner PDFs: ${e.message}`;
   }
 }
-
 // ======= Copy Shipping Label PDFs =======
 function copyShippingLabelPDFs() {
   let totalFiles = 0;
@@ -449,7 +711,6 @@ function copyShippingLabelPDFs() {
     return `⚠️ Failed to copy shipping label PDFs: ${e.message}`;
   }
 }
-
 // ======= Copy Shipping Manifest PDFs =======
 function copyShippingManifestPDFs() {
   let totalFiles = 0;
@@ -479,7 +740,6 @@ function copyShippingManifestPDFs() {
     return `⚠️ Failed to copy shipping manifest PDFs: ${e.message}`;
   }
 }
-
 // ======= Moving Shipping Docs =======
 function moveShippingDocuments() {
   try {
@@ -509,7 +769,6 @@ function moveShippingDocuments() {
     return `⚠️ Failed to prepare shipping documents: ${e.message}`;
   }
 }
-
 // ======= Purge All PDFs =======
 function purgeAllPDFs() {
   const allFolderIds = new Set([
@@ -545,7 +804,6 @@ function purgeAllPDFs() {
 
   return `✅ Purged ${totalDeleted} file(s) from all PDF folders`;
 }
-
 // ======= Purge Daily PDFs =======
 function purgeDailyShippingDocs() {
   try {
@@ -569,15 +827,10 @@ function purgeDailyShippingDocs() {
   }
 }
 
-
-
 // ======= Menards Shipping Extraction Script =======
 // ======= Menards Shipping Extraction Script =======
 // ======= Menards Shipping Extraction Script =======
 // ======= Menards Shipping Extraction Script =======
-
-
-
 /**
  * Configuration settings for the script.
  * @const
@@ -598,7 +851,6 @@ const CONFIG = {
     'XL-15': { internalSKU: 'DDXL152415', weight: 52.5 },
   },
 };
-
 /**
  * Main function to process Menards PDFs from a Drive folder and log data to a Sheet.
  */
@@ -674,7 +926,6 @@ function getOcrText_(file) {
   const text = doc.getBody().getText();
   return { content: text, tempDocId: ocrFile.id };
 }
-
 /**
  * Parses the "Ship To" block from the OCR text to extract address details.
  * @param {string} text The full text content from the PDF.
@@ -790,7 +1041,6 @@ function parseLineItems_(text) {
 // ======= WCS Shipping Extraction Script =======
 // ======= WCS Shipping Extraction Script =======
 
-
 /**
  * Configuration settings for the WCS script.
  * @const
@@ -803,7 +1053,6 @@ const CONFIG_WCS = {
     'DDAC-Tool-C': { internalSKU: 'DDAC-TOOL',  weight: 19.9 },
   },
 };
-
 /**
  * Main function to process WCS PDFs from a Drive folder and log data to a Sheet.
  */
@@ -871,8 +1120,6 @@ function extractWCSData() {
   }
   Logger.log(`✅ Extracted shipping info from ${processedCount} WCS PDF(s).`);
 }
-
-
 /**
  * Parses the WCS "Ship To" block from OCR text by finding the block between "Prepared By" and "Memo".
  * @param {string} text The full text content from the PDF.
@@ -914,7 +1161,6 @@ function parseWCSShipToBlock_(text) {
   }
   return data;
 }
-
 /**
  * Parses all WCS line items from the OCR text using a columnar approach.
  * @param {string} text The full text content from the PDF.
@@ -952,7 +1198,6 @@ function parseWCSLineItems_(text) {
 }
 // =======================================================
 // =======================================================
-
 /**
  * Scans a single folder for all PDF files, calculates their native page count,
  * and attributes the count to a partner based on filename patterns.
@@ -2441,5 +2686,222 @@ function sendPdfsFromFolder() {
   } catch (e) {
     // Log any errors that occur
     Logger.log("Error: " + e.message);
+  }
+}
+
+// --- Configuration ---
+// Folder ID from your request
+const MERGE_FOLDER_ID = '1xLWC3TL8ETo_WV1zF88CMBN2BBT2FAGK'; 
+// Output filename from your request
+const MERGED_FILENAME = 'document-PS-merged.pdf';
+// ---------------------
+
+/**
+ * Merges all PDFs in a specific folder (MERGE_FOLDER_ID), saves the result
+ * as MERGED_FILENAME, and deletes the original files.
+ */
+function simpleMerge() {
+  // --- Define Source and Output Name ---
+  const sourceFolder = DriveApp.getFolderById(MERGE_FOLDER_ID);
+  const outputFileName = MERGED_FILENAME;
+  // --- End Definitions ---
+
+  Logger.log(`Starting PDF Merge function for: ${outputFileName} in folder ${MERGE_FOLDER_ID}`);
+
+  // --- Configuration Checks ---
+  if (typeof PROJECT_KEY === 'undefined' || !PROJECT_KEY || PROJECT_KEY === 'YOUR_PROJECT_KEY' || 
+      typeof SECRET_KEY === 'undefined' || !SECRET_KEY || SECRET_KEY === 'YOUR_SECRET_KEY') {
+    Logger.log('ERROR: iLovePDF PROJECT_KEY/SECRET_KEY missing. Please set them at the top of the script.'); return; 
+  }
+  
+  // --- Get files from source, delete old merged file ---
+  
+  // 1. Delete old merged file (if it matches the static naming)
+  try {
+    const oldMergedFiles = sourceFolder.getFilesByName(outputFileName);
+    while (oldMergedFiles.hasNext()) {
+      const oldFile = oldMergedFiles.next();
+      oldFile.setTrashed(true);
+      Logger.log(`Found and deleted old merged file from source: ${outputFileName}`);
+    }
+  } catch (e) {
+    Logger.log(`Warning: Could not check for/delete old merged file. ${e.message}`);
+  }
+
+  // 2. Get new files from source
+  const allFiles = sourceFolder.getFilesByType(MimeType.PDF);
+  const filesToProcess = [];
+
+  while (allFiles.hasNext()) {
+    const file = allFiles.next();
+    // Don't accidentally re-merge a file we just made (or one left from a failed run)
+    if (file.getName() !== outputFileName) { 
+      filesToProcess.push(file);
+    }
+  }
+  // --- END ---
+
+  // --- Handle 0, 1, or many files ---
+  if (filesToProcess.length === 0) {
+    Logger.log('No new PDF files found in source folder to merge.');
+    return;
+  }
+
+  if (filesToProcess.length === 1) {
+    // --- MODIFIED LOGIC --- 
+    // Just rename the single file to the desired output name.
+    const file = filesToProcess[0];
+    const oldName = file.getName();
+    try {
+      file.setName(outputFileName);
+      Logger.log(`SUCCESS! Only one file found. Renamed "${oldName}" to "${outputFileName}". No merge needed.`);
+    } catch (e) {
+      Logger.log(`ERROR: Could not rename single file. ${e.message}`);
+    }
+    return; // We are done
+  }
+  // --- END MODIFICATION ---
+
+  // If we get here, we have > 1 file to merge
+  Logger.log(`Found ${filesToProcess.length} files. Starting API merge...`);
+
+  try {
+    // (This assumes getIloveApiToken_() helper function is in your project)
+    const authToken = getIloveApiToken_(); 
+    const headers = { 'Authorization': 'Bearer ' + authToken };
+
+    // === Step 1: Start Merge Task ===
+    Logger.log('Starting merge task...');
+    const startResponse = UrlFetchApp.fetch('https://api.ilovepdf.com/v1/start/merge', {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (startResponse.getResponseCode() !== 200) throw new Error(`Merge Start failed: ${startResponse.getContentText()}`);
+    const startData = JSON.parse(startResponse.getContentText());
+    const server = `https://${startData.server}`;
+    const taskId = startData.task;
+    Logger.log(`Task started with ID: ${taskId}`);
+
+    // === Step 2: Upload Files ===
+    const uploadedFiles = []; 
+    for (const file of filesToProcess) {
+      Logger.log(`Uploading file: ${file.getName()}...`);
+      const uploadResponse = UrlFetchApp.fetch(`${server}/v1/upload`, {
+        method: 'post',
+        headers: headers,
+        payload: { task: taskId, file: file.getBlob() },
+        muteHttpExceptions: true
+      });
+      if (uploadResponse.getResponseCode() !== 200) throw new Error(`Upload failed for ${file.getName()}: ${uploadResponse.getContentText()}`);
+      const uploadData = JSON.parse(uploadResponse.getContentText());
+      uploadedFiles.push({ server_filename: uploadData.server_filename, filename: file.getName() }); 
+      Logger.log(`Upload successful for ${file.getName()}`);
+    }
+
+    // === Step 3: Process the Merge Task ===
+    Logger.log(`Processing the merge for ${uploadedFiles.length} files...`);
+    const processPayload = {
+        task: taskId,
+        tool: 'merge',
+        files: uploadedFiles 
+    };
+
+    const processResponse = UrlFetchApp.fetch(`${server}/v1/process`, {
+      method: 'post',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(processPayload),
+      muteHttpExceptions: true
+    });
+      if (processResponse.getResponseCode() !== 200) {
+        throw new Error(`Merge Process failed: ${processResponse.getContentText()}`);
+      }
+    Logger.log(`Processing successful: ${processResponse.getContentText()}`);
+    
+    // === Step 4: Download the Result ===
+    Logger.log('Downloading the final merged PDF...');
+    const downloadResponse = UrlFetchApp.fetch(`${server}/v1/download/${taskId}`, {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true 
+    });
+
+    if (downloadResponse.getResponseCode() !== 200) {
+      throw new Error(`Download failed: ${downloadResponse.getContentText()}`);
+    }
+    
+    const mergedPdfBlob = downloadResponse.getBlob().setName(outputFileName); 
+    
+    // === Step 5: Save to Google Drive (Source Folder) ===
+    const finalFile = sourceFolder.createFile(mergedPdfBlob);
+    Logger.log(`SUCCESS! File "${outputFileName}" saved to source folder: ${finalFile.getUrl()}`);
+
+    // --- MODIFIED LOGIC --- 
+    // === Step 6: Delete original files ===
+    Logger.log(`Deleting ${filesToProcess.length} original files...`);
+    let deletedCount = 0;
+    for (const file of filesToProcess) {
+      const fileName = file.getName();
+      try {
+        file.setTrashed(true);
+        deletedCount++;
+      } catch (e) {
+        Logger.log(`Warning: Could not delete file ${fileName}. ${e.message}`);
+      }
+    }
+    Logger.log(`✅ Merge complete. ${deletedCount} original files deleted.`);
+
+  } catch (e) {
+    Logger.log(`An error occurred during merge: ${e.toString()}`);
+  }
+}
+
+/**
+ * Helper function to get a cached iLovePDF API token.
+ * (This is the same function you provided)
+ */
+function getIloveApiToken_() {
+  const cache = CacheService.getScriptCache();
+  let token = cache.get('ilovepdf_token');
+  
+  if (token) {
+    Logger.log('Using cached API token.');
+    return token;
+  }
+
+  Logger.log('No cached token. Requesting new API token...');
+  const url = 'https://api.ilovepdf.com/v1/auth';
+  const payload = {
+    public_key: PROJECT_KEY,
+    secret_key: SECRET_KEY
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      const data = JSON.parse(responseBody);
+      token = data.token;
+      // Cache for 50 minutes (token expires in 60)
+      cache.put('ilovepdf_token', token, 3000); 
+      Logger.log('Successfully retrieved new API token.');
+      return token;
+    } else {
+      Logger.log(`Error getting token (HTTP ${responseCode}): ${responseBody}`);
+      throw new Error(`Failed to authenticate with iLovePDF. Response: ${responseBody}`);
+    }
+  } catch (e) {
+    Logger.log(`Exception during authentication: ${e.message}`);
+    throw e;
   }
 }
