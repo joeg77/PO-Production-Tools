@@ -225,6 +225,9 @@
         <details>
           <summary>Prepping</summary>
           <div class="panel">
+            <button class="remote-btn pdf" onclick="runFunction('processAllFilesStandard')">Run Standard Report</button>
+            <button class="remote-btn pdf" onclick="runFunction('processAllFilesThurs')">Run Friday Report</button>
+            <button class="remote-btn pdf" onclick="runFunction('processAllFilesSun')">Run Sunday Report</button>
             <button class="remote-btn pdf" onclick="runFunction('simpleMerge')">Simple Merger</button>
             <button class="remote-btn pdf" onclick="runFunction('mergeManifests')">Merge Manifests</button>
             <button class="remote-btn pdf" onclick="runFunction('moveShippingDocuments')">Move Shipping Documents To Email Folder</button>
